@@ -1,111 +1,356 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Keyboard Visualiser</title>
-  <style>
-    body {
-      margin: 0;
-      background: #111;
-    }
-    canvas {
-      display: block;
-      background: #222;
-    }
-    #keyboard {
-      display: flex;
-      justify-content: center;
-      padding: 10px;
-    }
-    .key {
-      width: 40px;
-      height: 120px;
-      margin: 2px;
-      background: white;
-      border: 1px solid #ccc;
-      box-shadow: 1px 1px 2px #000;
-      cursor: pointer;
-    }
-    .key.playing {
-      background: orange;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="visualiser" width="720" height="200"></canvas>
-  <div id="keyboard">
-    <div class="key" data-note="C4">C</div>
-    <div class="key" data-note="D4">D</div>
-    <div class="key" data-note="E4">E</div>
-    <div class="key" data-note="F4">F</div>
-    <div class="key" data-note="G4">G</div>
-    <div class="key" data-note="A4">A</div>
-    <div class="key" data-note="B4">B</div>
-    <div class="key" data-note="C5">C</div>
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Physics of Harmony · Keyboard & Visualiser</title>
 
-  <script>
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
-    const canvas = document.getElementById("visualiser");
-    const canvasCtx = canvas.getContext("2d");
-
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    function draw() {
-      requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(dataArray);
-      canvasCtx.fillStyle = "#111";
-      canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-      const barWidth = (canvas.width / bufferLength) * 2.5;
-      let x = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        const barHeight = dataArray[i];
-        canvasCtx.fillStyle = `rgb(${barHeight + 100},50,50)`;
-        canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-        x += barWidth + 1;
+    <!-- ---------------- CSS ---------------- -->
+    <style>
+      :root {
+        /* Colour palette provided by Leo */
+        --primary: #2BAF90;
+        --accent:  #A1D4B1;
+        --highlight:#F1A512;
+        --warn:    #DD4111;
+        --deep:    #8C0027;
+        --bg:      #0D1B2A;
+        --text-light:#f4f4f4;
+        --text-muted:#b0bec5;
       }
-    }
 
-    draw();
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text-light);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        min-height: 100vh;
+      }
 
-    function playNote(note) {
-      const osc = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
+      /* === Controls panel === */
+      #controls {
+        display: grid;
+        gap: 1rem 2rem;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        background: #112433;
+        padding: 1.2rem 1.5rem;
+        border-radius: 14px;
+        box-shadow: 0 4px 14px rgba(0,0,0,.35);
+        max-width: 900px;
+        width: 100%;
+        margin-bottom: 2rem;
+      }
+      #controls label {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: .4rem;
+      }
+      #controls input,
+      #controls select {
+        padding: .45rem .6rem;
+        border-radius: 8px;
+        background: #0d2130;
+        color: var(--text-light);
+        border: 1px solid var(--accent);
+        font-size: .9rem;
+      }
+      #controls input[type="range"] { accent-color: var(--primary); }
+      #controls input[type="checkbox"] { accent-color: var(--highlight); }
 
-      osc.type = "sine";
-      osc.frequency.value = noteToFrequency(note);
-      osc.connect(gainNode);
-      gainNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
+      /* === Keyboard === */
+      #keyboard {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: .35rem;
+        user-select: none;
+        overflow-x: auto;
+        padding-bottom: .5rem;
+      }
+      .white-key {
+        position: relative;
+        width: 48px;
+        height: 200px;
+        background: var(--text-light);
+        border-radius: 6px;
+        box-shadow: inset 0 -2px 4px rgba(0,0,0,.2), 0 2px 4px rgba(0,0,0,.25);
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        font-size: .7rem;
+        color: #333;
+      }
+      .black-key {
+        position: absolute;
+        left: 32px;
+        top: 0;
+        width: 32px;
+        height: 130px;
+        background: #222;
+        border-radius: 4px;
+        z-index: 2;
+        box-shadow: inset 0 -2px 4px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.25);
+        color: #eee;
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        font-size: .55rem;
+      }
+      .key-active {
+        background: var(--highlight) !important;
+        color: var(--bg) !important;
+      }
 
-      osc.start();
-      gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
-      osc.stop(audioCtx.currentTime + 1);
-    }
+      /* === Visualiser === */
+      #vis-wrapper {
+        margin-top: 2.5rem;
+        width: 100%;
+        max-width: 900px;
+        background: #09151f;
+        padding: 1rem 1.2rem 1.8rem;
+        border-radius: 14px;
+        box-shadow: 0 4px 14px rgba(0,0,0,.4);
+      }
+      #waveCanvas,
+      #fftCanvas {
+        width: 100%;
+        height: 160px;
+        background: #fff;
+        border-radius: 8px;
+        display: block;
+        margin-bottom: 1.2rem;
+      }
 
-    function noteToFrequency(note) {
-      const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-      const octave = parseInt(note.slice(-1));
-      const key = note.slice(0, -1);
-      const index = notes.indexOf(key);
-      const n = index + (octave - 4) * 12;
-      return 440 * Math.pow(2, n / 12);
-    }
+      @media(max-width:600px){
+        .white-key { width:36px; height:160px; }
+        .black-key { width:24px; left:24px; height:100px; }
+      }
+    </style>
+  </head>
 
-    document.querySelectorAll(".key").forEach((el) => {
-      el.addEventListener("mousedown", () => {
-        el.classList.add("playing");
-        playNote(el.dataset.note);
+  <body>
+    <!-- -------------- Controls -------------- -->
+    <form id="controls">
+      <label>
+        Waveform
+        <select id="waveform">
+          <option value="sine" selected>Sine</option>
+          <option value="square">Square</option>
+          <option value="sawtooth">Sawtooth</option>
+          <option value="triangle">Triangle</option>
+        </select>
+      </label>
+
+      <label>
+        Octaves
+        <select id="octaveSpan">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+        </select>
+      </label>
+
+      <label>
+        Frequency Offset (<span id="freqLabel">0</span> Hz)
+        <input type="range" id="freqOffset" min="-200" max="200" step="1" value="0" />
+      </label>
+
+      <label>
+        Volume (<span id="volLabel">70</span> %)
+        <input type="range" id="masterVol" min="0" max="100" value="70" />
+      </label>
+
+      <label style="flex-direction:row; align-items:center; gap:.5rem;">
+        <input type="checkbox" id="polyToggle" /> Polyphony (Hold Notes)
+      </label>
+    </form>
+
+    <!-- -------------- Keyboard -------------- -->
+    <div id="keyboard"></div>
+
+    <!-- -------------- Visualiser -------------- -->
+    <section id="vis-wrapper">
+      <canvas id="waveCanvas"></canvas>
+      <canvas id="fftCanvas"></canvas>
+    </section>
+
+    <!-- ---------------- JS ---------------- -->
+    <script>
+      // ---- Audio Context & Nodes ----
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AC();
+      const masterGain = audioCtx.createGain();
+      masterGain.connect(audioCtx.destination);
+      masterGain.gain.value = 0.7; // default 70%
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      masterGain.connect(analyser);
+
+      // ---- DOM Elements ----
+      const keyboardEl   = document.getElementById("keyboard");
+      const waveformSel  = document.getElementById("waveform");
+      const offsetSlider = document.getElementById("freqOffset");
+      const freqLabel    = document.getElementById("freqLabel");
+      const volSlider    = document.getElementById("masterVol");
+      const volLabel     = document.getElementById("volLabel");
+      const polyToggle   = document.getElementById("polyToggle");
+      const octaveSel    = document.getElementById("octaveSpan");
+
+      // ---- Build Keyboard ----
+      const baseNotes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+      const keyMap = {}; // keyChar -> frequency
+      let oscillators = {};
+
+      function buildKeyboard(octaveSpan=2) {
+        keyboardEl.innerHTML = "";
+        keyMapArray = [];
+        keyMapKeys  = [];
+        const startOctave = 4; // middle C = C4
+        let labelKeys = "ASDFGHJkl;'.".split(""); // 12 keys row, fallback labeling
+        for(let o=0;o<octaveSpan;o++){
+          baseNotes.forEach((note,nIdx)=>{
+            const midiNumber = 12*(startOctave+o) + nIdx;
+            const frequency = 440 * Math.pow(2,(midiNumber-69)/12);
+            const keyChar = labelKeys[(o*12 + nIdx)%labelKeys.length] || "";
+            keyMap[keyChar.toUpperCase()] = frequency;
+
+            // create white key wrapper
+            if(!note.includes("#")){
+              const white = document.createElement("div");
+              white.className = "white-key key";
+              white.dataset.freq = frequency;
+              white.innerHTML = `<span>${keyChar}</span>`;
+              keyboardEl.appendChild(white);
+
+              // if next note is sharp, add black key inside
+              const nextIdx = nIdx+1;
+              if(nextIdx < baseNotes.length && baseNotes[nextIdx].includes("#")){
+                const black = document.createElement("div");
+                black.className = "black-key key";
+                black.dataset.freq = frequency * Math.pow(2,1/12); // next semitone
+                black.innerHTML = `<span>${labelKeys[(o*12 + nextIdx)%labelKeys.length]}</span>`;
+                white.appendChild(black);
+              }
+            }
+          });
+        }
+      }
+
+      buildKeyboard(2); // default two octaves
+
+      octaveSel.addEventListener("change", e=>{
+        buildKeyboard(parseInt(octaveSel.value,10));
       });
-      el.addEventListener("mouseup", () => {
-        el.classList.remove("playing");
+
+      // ---- Utility ----
+      function createOsc(freq){
+        const osc = audioCtx.createOscillator();
+        osc.type = waveformSel.value;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.connect(masterGain);
+        osc.start();
+        return osc;
+      }
+
+      // ---- Event Handling ----
+      function noteOn(freq, keyEl){
+        if(!polyToggle.checked){ // monophonic: stop all
+          Object.values(oscillators).forEach(o=>o.stop());
+          oscillators = {};
+          document.querySelectorAll(".key-active").forEach(k=>k.classList.remove("key-active"));
+        }
+        const osc = createOsc(freq + Number(offsetSlider.value));
+        keyEl.classList.add("key-active");
+        osc.onended = ()=> keyEl.classList.remove("key-active");
+        oscillators[freq] = osc;
+      }
+
+      function noteOff(freq){
+        if(oscillators[freq]){
+          oscillators[freq].stop();
+          delete oscillators[freq];
+        }
+      }
+
+      keyboardEl.addEventListener("mousedown", e=>{
+        if(e.target.classList.contains("key")){
+          const freq = Number(e.target.dataset.freq);
+          noteOn(freq, e.target);
+        }
       });
-    });
-  </script>
-</body>
+      window.addEventListener("mouseup", ()=>{
+        if(!polyToggle.checked){
+          Object.entries(oscillators).forEach(([f,o])=>o.stop());
+          oscillators={};
+          document.querySelectorAll(".key-active").forEach(k=>k.classList.remove("key-active"));
+        }
+      });
+
+      // ---- Keyboard shortcuts ----
+      document.addEventListener("keydown", e=>{
+        const freq = keyMap[e.key.toUpperCase()];
+        if(freq && !e.repeat){
+          const keyEl = [...document.querySelectorAll(".key")].find(k=>Number(k.dataset.freq)===freq);
+          noteOn(freq, keyEl);
+        }
+      });
+      document.addEventListener("keyup", e=>{
+        const freq = keyMap[e.key.toUpperCase()];
+        if(freq) noteOff(freq);
+      });
+
+      // ---- Label Updates ----
+      offsetSlider.addEventListener("input", ()=> freqLabel.textContent = offsetSlider.value);
+      volSlider.addEventListener("input", ()=>{
+        masterGain.gain.value = volSlider.value/100;
+        volLabel.textContent = volSlider.value;
+      });
+
+      waveformSel.addEventListener("change", ()=>{
+        // change type for all live oscillators
+        Object.values(oscillators).forEach(o=> o.type = waveformSel.value);
+      });
+
+      // ---- Visualiser ----
+      const waveCtx = document.getElementById("waveCanvas").getContext("2d");
+      const fftCtx  = document.getElementById("fftCanvas").getContext("2d");
+
+      function draw(){
+        requestAnimationFrame(draw);
+
+        // Waveform
+        const timeData = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(timeData);
+        waveCtx.clearRect(0,0,waveCtx.canvas.width,waveCtx.canvas.height);
+        waveCtx.lineWidth=2;
+        waveCtx.strokeStyle= "var(--primary)";
+        waveCtx.beginPath();
+        for(let i=0;i<timeData.length;i++){
+          const x = i/timeData.length * waveCtx.canvas.width;
+          const y = timeData[i]/255 * waveCtx.canvas.height;
+          i===0 ? waveCtx.moveTo(x,y) : waveCtx.lineTo(x,y);
+        }
+        waveCtx.stroke();
+
+        // Spectrum
+        const freqData = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(freqData);
+        fftCtx.clearRect(0,0,fftCtx.canvas.width,fftCtx.canvas.height);
+        const barW = fftCtx.canvas.width / freqData.length;
+        for(let i=0;i<freqData.length;i++){
+          const barH = freqData[i];
+          fftCtx.fillStyle="var(--highlight)";
+          fftCtx.fillRect(i*barW, fftCtx.canvas.height-barH, barW*0.8, barH);
+        }
+      }
+      draw();
+    </script>
+  </body>
 </html>
