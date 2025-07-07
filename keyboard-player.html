@@ -3,335 +3,144 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Physics of Harmony · Interactive Keyboard</title>
+    <title>Physics of Harmony · Interactive Keyboard</title>
 
-    <!-- ---------------- CSS ---------------- -->
+    <!-- ‑‑‑ Colour Palette ‑‑‑ -->
     <style>
       :root {
-        --primary: #7EF9A6;
-        --accent:  #B1FFDA;
-        --highlight:#F7D774;
-        --warn:    #F76060;
-        --deep:    #14342B;
-        --bg:      #0F1C1F;
-        --panel:   #15292E;
+        --primary:   #2BAF90; /* green line */
+        --bg:        #0D2A35; /* page background */
+        --highlight: #F1A512; /* yellow bars */
+        --warn:      #DD4111; /* red harmonics */
+        --deep:      #8C0027; /* panel */
+        --accent:    #A1D4B1; /* input borders */
         --text-light:#FFFFFF;
-        --text-muted:#9BB8C6;
+        --text-muted:#B0BEC5;
       }
-
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: "Segoe UI", system-ui, sans-serif;
-        background: var(--bg);
-        color: var(--text-light);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 1rem;
-        min-height: 100vh;
+      *{box-sizing:border-box;}
+      body{
+        margin:0;
+        font-family:"Segoe UI",system-ui,sans-serif;
+        background:var(--bg);
+        color:var(--text-light);
+        display:flex;flex-direction:column;align-items:center;
+        padding:1rem;min-height:100vh;
       }
-
-      #controls {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 1rem;
-        background: var(--panel);
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 14px rgba(0,0,0,.35);
-        max-width: 850px;
-        width: 100%;
-        margin-bottom: 2rem;
-      }
-
-      .control {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        font-size: 0.85rem;
-        color: var(--text-muted);
-      }
-
-      .control input,
-      .control select {
-        background: var(--bg);
-        color: var(--text-light);
-        border: 1px solid var(--accent);
-        border-radius: 8px;
-        padding: 0.35rem 0.7rem;
-        font-size: 0.9rem;
-        margin-top: 0.4rem;
-      }
-
-      .control input[type="range"] {
-        width: 120px;
-        accent-color: var(--primary);
-      }
-
-      #keyboard {
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 0.25rem;
-        user-select: none;
-        overflow-x: auto;
-        padding-bottom: 1rem;
-      }
-
-      .white-key {
-        position: relative;
-        width: 46px;
-        height: 180px;
-        background: var(--text-light);
-        border-radius: 6px;
-        box-shadow: inset 0 -2px 4px rgba(0,0,0,.2), 0 2px 4px rgba(0,0,0,.25);
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
-        font-size: 0.75rem;
-        color: #333;
-      }
-
-      .black-key {
-        position: absolute;
-        left: 30px;
-        top: 0;
-        width: 30px;
-        height: 110px;
-        background: #111;
-        border-radius: 4px;
-        z-index: 2;
-        box-shadow: inset 0 -2px 4px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.25);
-        color: #eee;
-        display: flex;
-        justify-content: center;
-        align-items: flex-end;
-        font-size: 0.55rem;
-      }
-
-      .key-active {
-        background: var(--highlight) !important;
-        color: var(--bg) !important;
-      }
-
-      #vis-wrapper {
-        margin-top: 2.5rem;
-        width: 100%;
-        max-width: 850px;
-        background: var(--panel);
-        padding: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 14px rgba(0,0,0,.4);
-      }
-
-      canvas {
-        width: 100%;
-        height: 160px;
-        background: #000;
-        border-radius: 8px;
-        display: block;
-        margin-bottom: 1rem;
-      }
-
-      @media(max-width:600px){
-        .white-key { width:34px; height:150px; }
-        .black-key { width:22px; left:22px; height:90px; }
-      }
+      /* ========= CONTROLS ========= */
+      #controls{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;background:var(--deep);padding:1rem 1.5rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);max-width:860px;width:100%;margin-bottom:2rem}
+      .control{display:flex;flex-direction:column;align-items:center;font-size:.85rem;color:var(--text-muted)}
+      .control input,.control select{background:var(--bg);color:var(--text-light);border:1px solid var(--accent);border-radius:8px;padding:.4rem .7rem;font-size:.9rem;margin-top:.35rem}
+      .control input[type=range]{width:120px;accent-color:var(--primary)}
+      /* ========= KEYBOARD ========= */
+      #keyboard{display:flex;gap:.25rem;overflow-x:auto;user-select:none;padding-bottom:1rem}
+      .white-key{position:relative;width:46px;height:180px;background:#fff;border-radius:6px;box-shadow:inset 0 -2px 4px rgba(0,0,0,.2),0 2px 4px rgba(0,0,0,.25);display:flex;justify-content:center;align-items:flex-end;font-size:.75rem;color:#333}
+      .black-key{position:absolute;left:30px;top:0;width:30px;height:110px;background:#111;border-radius:4px;z-index:2;box-shadow:inset 0 -2px 4px rgba(0,0,0,.5),0 2px 4px rgba(0,0,0,.25);color:#eee;display:flex;justify-content:center;align-items:flex-end;font-size:.55rem}
+      .key-active{background:var(--highlight)!important;color:var(--bg)!important}
+      /* ========= VISUALISER ========= */
+      #vis-wrapper{margin-top:2rem;width:100%;max-width:860px;background:var(--deep);padding:1rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.45)}
+      canvas{width:100%;height:160px;background:#000;border-radius:8px;display:block;margin-bottom:1rem}
+      #info{display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted)}
+      @media(max-width:620px){.white-key{width:34px;height:150px}.black-key{width:22px;left:22px;height:90px}}
     </style>
   </head>
-
   <body>
-    <!-- -------------- Controls -------------- -->
+    <!-- ========= CONTROLS ========= -->
     <div id="controls">
-      <div class="control">
-        Waveform
-        <select id="waveform">
-          <option value="sine" selected>Sine</option>
-          <option value="square">Square</option>
-          <option value="sawtooth">Saw</option>
-          <option value="triangle">Triangle</option>
-        </select>
-      </div>
-
-      <div class="control">
-        Octaves
-        <select id="octaveSpan">
-          <option value="1">1</option>
-          <option value="2" selected>2</option>
-          <option value="3">3</option>
-        </select>
-      </div>
-
-      <div class="control">
-        Detune
-        <input type="range" id="freqOffset" min="-200" max="200" step="1" value="0" />
-      </div>
-
-      <div class="control">
-        Volume
-        <input type="range" id="masterVol" min="0" max="100" value="70" />
-      </div>
-
-      <div class="control">
-        <label style="margin-top: 1.4rem;">
-          <input type="checkbox" id="polyToggle" /> Polyphonic
-        </label>
-      </div>
+      <div class="control">Waveform<select id="waveform"><option>sine</option><option>square</option><option>sawtooth</option><option>triangle</option></select></div>
+      <div class="control">Octaves<select id="octaveSpan"><option>1</option><option selected>2</option><option>3</option></select></div>
+      <div class="control">Detune<input type="range" id="detune" min="-200" max="200" value="0"></div>
+      <div class="control">Volume<input type="range" id="volume" min="0" max="100" value="70"></div>
+      <div class="control" style="margin-top:1.4rem"><label><input type="checkbox" id="poly"> Polyphonic</label></div>
     </div>
 
-    <!-- -------------- Keyboard -------------- -->
+    <!-- ========= KEYBOARD ========= -->
     <div id="keyboard"></div>
 
-    <!-- -------------- Visualiser -------------- -->
+    <!-- ========= VISUALISER ========= -->
     <section id="vis-wrapper">
-      <canvas id="waveCanvas"></canvas>
+      <canvas id="oscCanvas"></canvas>
       <canvas id="fftCanvas"></canvas>
+      <div id="info"><span id="freqTxt">— Hz</span><span id="noteTxt">—</span></div>
     </section>
 
-    <!-- JavaScript remains mostly unchanged; base sound removed from init -->
     <script>
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const audioCtx = new AC();
-      const masterGain = audioCtx.createGain();
-      masterGain.connect(audioCtx.destination);
-      masterGain.gain.value = 0.7;
+      /* ------- AUDIO SETUP ------- */
+      const AC = window.AudioContext||window.webkitAudioContext;
+      const ctx = new AC();
+      const master = ctx.createGain();
+      master.gain.value=.7;master.connect(ctx.destination);
+      const analyser = ctx.createAnalyser();analyser.fftSize=2048;master.connect(analyser);
 
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      masterGain.connect(analyser);
+      /* ------- DOM LINKS ------- */
+      const kbEl  = document.getElementById('keyboard');
+      const waveSel=document.getElementById('waveform');
+      const octSel=document.getElementById('octaveSpan');
+      const detune=document.getElementById('detune');
+      const vol=document.getElementById('volume');
+      const poly=document.getElementById('poly');
+      const freqTxt=document.getElementById('freqTxt');
+      const noteTxt=document.getElementById('noteTxt');
 
-      const waveformSel = document.getElementById("waveform");
-      const octaveSel = document.getElementById("octaveSpan");
-      const offsetSlider = document.getElementById("freqOffset");
-      const volSlider = document.getElementById("masterVol");
-      const polyToggle = document.getElementById("polyToggle");
-      const keyboardEl = document.getElementById("keyboard");
+      /* ------- KEY MAPPING (2 oct row) ------- */
+      const physKeys="Q2W3ER5T6Y7U ZXCVBNM,./".replace(/\s/g,'').split(''); // 24 unique
+      const baseNotes=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+      const map={}; // physical key -> frequency
+      let oscillators={}; let currentFund=null;
 
-      const baseNotes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-      const keyMap = {};
-      let oscillators = {};
-
-      function buildKeyboard(octaves = 2) {
-        keyboardEl.innerHTML = "";
-        const startOct = 4;
-        const labelKeys = "ASDFGHJkl;'".split("");
-        for(let o = 0; o < octaves; o++) {
-          baseNotes.forEach((note, n) => {
-            const midi = 12 * (startOct + o) + n;
-            const freq = 440 * Math.pow(2, (midi - 69) / 12);
-            const label = labelKeys[(o*12 + n)%labelKeys.length];
-            keyMap[label.toUpperCase()] = freq;
-            if (!note.includes("#")) {
-              const white = document.createElement("div");
-              white.className = "white-key key";
-              white.dataset.freq = freq;
-              white.innerHTML = `<span>${label}</span>`;
-              keyboardEl.appendChild(white);
-              if (n+1 < baseNotes.length && baseNotes[n+1].includes("#")) {
-                const black = document.createElement("div");
-                black.className = "black-key key";
-                black.dataset.freq = freq * Math.pow(2, 1/12);
-                black.innerHTML = `<span>${labelKeys[(o*12+n+1)%labelKeys.length]}</span>`;
-                white.appendChild(black);
+      function buildKeyboard(oct=2){kbEl.innerHTML='';Object.keys(map).forEach(k=>delete map[k]);
+        const startOct=4;let p=0;
+        for(let o=0;o<oct;o++){
+          baseNotes.forEach((note,i)=>{
+            const midi=12*(startOct+o)+i;const f=440*Math.pow(2,(midi-69)/12);
+            const phys=physKeys[p%physKeys.length];map[phys.toUpperCase()]=f;
+            if(!note.includes('#')){
+              const w=document.createElement('div');w.className='white-key key';w.dataset.freq=f;w.innerHTML=`<span>${phys}</span>`;kbEl.appendChild(w);
+              if(i+1<12&&baseNotes[i+1].includes('#')){
+                const b=document.createElement('div');b.className='black-key key';b.dataset.freq=f*Math.pow(2,1/12);b.innerHTML=`<span>${physKeys[(p+1)%physKeys.length]}</span>`;w.appendChild(b);
               }
             }
+            p++;
           });
         }
       }
-
       buildKeyboard(2);
-      octaveSel.addEventListener("change", () => buildKeyboard(parseInt(octaveSel.value, 10)));
+      octSel.onchange=()=>buildKeyboard(parseInt(octSel.value));
 
-      function createOsc(freq) {
-        const osc = audioCtx.createOscillator();
-        osc.type = waveformSel.value;
-        osc.frequency.setValueAtTime(freq + Number(offsetSlider.value), audioCtx.currentTime);
-        osc.connect(masterGain);
-        osc.start();
-        return osc;
+      /* ------- UTIL ------- */
+      function play(freq,el){if(!poly.checked){stopAll();}
+        const osc=ctx.createOscillator();osc.type=waveSel.value;osc.frequency.value=freq+Number(detune.value);
+        osc.connect(master);osc.start();osc.onended=()=>el.classList.remove('key-active');
+        oscillators[freq]=osc;el.classList.add('key-active');currentFund=freq;freqTxt.textContent=freq.toFixed(1)+' Hz';noteTxt.textContent=noteFromFreq(freq);
       }
+      function stop(freq){if(oscillators[freq]){oscillators[freq].stop();delete oscillators[freq];}}
+      function stopAll(){Object.values(oscillators).forEach(o=>o.stop());oscillators={};document.querySelectorAll('.key-active').forEach(k=>k.classList.remove('key-active'));currentFund=null;}
+      function noteFromFreq(f){const n=Math.round(12*Math.log2(f/440))+69;return baseNotes[n%12]+Math.floor(n/12-1);} // crude
 
-      function noteOn(freq, keyEl) {
-        if (!polyToggle.checked) {
-          Object.values(oscillators).forEach(o => o.stop());
-          oscillators = {};
-          document.querySelectorAll(".key-active").forEach(k => k.classList.remove("key-active"));
-        }
-        const osc = createOsc(freq);
-        keyEl.classList.add("key-active");
-        osc.onended = () => keyEl.classList.remove("key-active");
-        oscillators[freq] = osc;
-      }
+      /* ------- POINTER EVENTS ------- */
+      kbEl.addEventListener('mousedown',e=>{if(e.target.classList.contains('key'))play(+e.target.dataset.freq,e.target);});
+      window.addEventListener('mouseup',()=>{if(!poly.checked)stopAll();});
+      /* ------- KEYBOARD EVENTS ------- */
+      document.addEventListener('keydown',e=>{const f=map[e.key.toUpperCase()];if(f&&!e.repeat){const el=[...document.querySelectorAll('.key')].find(k=>+k.dataset.freq===f);play(f,el);}});
+      document.addEventListener('keyup',e=>{const f=map[e.key.toUpperCase()];if(f&&!poly.checked)stop(f);});
 
-      function noteOff(freq) {
-        if (oscillators[freq]) {
-          oscillators[freq].stop();
-          delete oscillators[freq];
-        }
-      }
+      /* ------- CONTROL BINDINGS ------- */
+      vol.oninput=()=>master.gain.value=vol.value/100;waveSel.onchange=()=>Object.values(oscillators).forEach(o=>o.type=waveSel.value);
 
-      keyboardEl.addEventListener("mousedown", e => {
-        if (e.target.classList.contains("key")) {
-          const freq = Number(e.target.dataset.freq);
-          noteOn(freq, e.target);
-        }
-      });
-      window.addEventListener("mouseup", () => {
-        if (!polyToggle.checked) {
-          Object.values(oscillators).forEach(o => o.stop());
-          oscillators = {};
-          document.querySelectorAll(".key-active").forEach(k => k.classList.remove("key-active"));
-        }
-      });
+      /* ------- VISUALISERS ------- */
+      const oscCtx=document.getElementById('oscCanvas').getContext('2d');
+      const fftCtx=document.getElementById('fftCanvas').getContext('2d');
 
-      document.addEventListener("keydown", e => {
-        const freq = keyMap[e.key.toUpperCase()];
-        if (freq && !e.repeat) {
-          const keyEl = [...document.querySelectorAll(".key")].find(k => Number(k.dataset.freq) === freq);
-          if (keyEl) noteOn(freq, keyEl);
-        }
-      });
-      document.addEventListener("keyup", e => {
-        const freq = keyMap[e.key.toUpperCase()];
-        if (freq) noteOff(freq);
-      });
+      function draw(){requestAnimationFrame(draw);
+        const timeData=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(timeData);
+        oscCtx.clearRect(0,0,oscCtx.canvas.width,oscCtx.canvas.height);
+        oscCtx.beginPath();for(let i=0;i<timeData.length;i++){const x=i/timeData.length*oscCtx.canvas.width;const y=timeData[i]/255*oscCtx.canvas.height;i?oscCtx.lineTo(x,y):oscCtx.moveTo(x,y);}oscCtx.strokeStyle='var(--primary)';oscCtx.lineWidth=1.5;oscCtx.stroke();
 
-      volSlider.addEventListener("input", () => {
-        masterGain.gain.value = volSlider.value / 100;
-      });
-
-      waveformSel.addEventListener("change", () => {
-        Object.values(oscillators).forEach(o => o.type = waveformSel.value);
-      });
-
-      const waveCtx = document.getElementById("waveCanvas").getContext("2d");
-      const fftCtx = document.getElementById("fftCanvas").getContext("2d");
-
-      function draw() {
-        requestAnimationFrame(draw);
-        const timeData = new Uint8Array(analyser.fftSize);
-        analyser.getByteTimeDomainData(timeData);
-        waveCtx.clearRect(0,0,waveCtx.canvas.width,waveCtx.canvas.height);
-        waveCtx.beginPath();
-        for (let i = 0; i < timeData.length; i++) {
-          const x = i / timeData.length * waveCtx.canvas.width;
-          const y = timeData[i] / 255 * waveCtx.canvas.height;
-          i === 0 ? waveCtx.moveTo(x, y) : waveCtx.lineTo(x, y);
-        }
-        waveCtx.strokeStyle = "var(--primary)";
-        waveCtx.lineWidth = 1.5;
-        waveCtx.stroke();
-
-        const freqData = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(freqData);
+        const freqData=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(freqData);
         fftCtx.clearRect(0,0,fftCtx.canvas.width,fftCtx.canvas.height);
-        const barW = fftCtx.canvas.width / freqData.length;
-        for (let i = 0; i < freqData.length; i++) {
-          const barH = freqData[i];
-          fftCtx.fillStyle = "var(--highlight)";
-          fftCtx.fillRect(i * barW, fftCtx.canvas.height - barH, barW * 0.8, barH);
-        }
+        const barW=fftCtx.canvas.width/freqData.length;
+        for(let i=0;i<freqData.length;i++){const h=freqData[i];fftCtx.fillStyle='var(--highlight)';fftCtx.fillRect(i*barW,fftCtx.canvas.height-h,barW*.85,h);}        
+        // harmonic overlays (red) if single fundamental
+        if(currentFund){const hzPerBin=ctx.sampleRate/2/freqData.length;for(let h=2;h<=6;h++){const idx=Math.round(currentFund*h/hzPerBin);if(idx<freqData.length){const x=idx*barW;fftCtx.strokeStyle='var(--warn)';fftCtx.beginPath();fftCtx.moveTo(x,0);fftCtx.lineTo(x,fftCtx.canvas.height);fftCtx.stroke();}}}
       }
       draw();
     </script>
