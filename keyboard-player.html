@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Synth Piano with Visualizer</title>
+  <title>Synth Piano with ASDR + Visualizers</title>
   <style>
     body {
       background: #0D2A35;
@@ -20,8 +20,8 @@
     #piano {
       display: flex;
       justify-content: center;
-      gap: 5px;
       flex-wrap: wrap;
+      gap: 5px;
       margin-bottom: 30px;
     }
 
@@ -30,7 +30,6 @@
       border: none;
       width: 40px;
       height: 150px;
-      line-height: 150px;
       font-weight: bold;
       color: #0D2A35;
       cursor: pointer;
@@ -65,7 +64,7 @@
 
     label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       color: #F1A512;
       font-size: 14px;
     }
@@ -98,7 +97,7 @@
   </style>
 </head>
 <body>
-  <h1>Synth Piano with Visualizers</h1>
+  <h1>Synth Piano with ASDR & Visualizers</h1>
   <div id="piano"></div>
 
   <div class="sliders">
@@ -107,8 +106,24 @@
       <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
     </div>
     <div class="slider-group">
-      <label for="frequency">Master Frequency (Hz)</label>
+      <label for="masterFreq">Master Frequency (Hz)</label>
       <input type="range" id="masterFreq" min="100" max="1000" step="1" value="440">
+    </div>
+    <div class="slider-group">
+      <label for="attack">Attack (s)</label>
+      <input type="range" id="attack" min="0" max="2" step="0.01" value="0.1">
+    </div>
+    <div class="slider-group">
+      <label for="decay">Decay (s)</label>
+      <input type="range" id="decay" min="0" max="2" step="0.01" value="0.2">
+    </div>
+    <div class="slider-group">
+      <label for="sustain">Sustain (0–1)</label>
+      <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.7">
+    </div>
+    <div class="slider-group">
+      <label for="release">Release (s)</label>
+      <input type="range" id="release" min="0" max="3" step="0.01" value="1">
     </div>
   </div>
 
@@ -120,24 +135,27 @@
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     const gainNode = context.createGain();
+    gainNode.connect(analyser);
+    analyser.connect(context.destination);
+
     const volumeSlider = document.getElementById("volume");
     const masterFreqSlider = document.getElementById("masterFreq");
 
-    gainNode.connect(analyser);
-    analyser.connect(context.destination);
+    const attackSlider = document.getElementById("attack");
+    const decaySlider = document.getElementById("decay");
+    const sustainSlider = document.getElementById("sustain");
+    const releaseSlider = document.getElementById("release");
+
+    volumeSlider.addEventListener("input", () => {
+      gainNode.gain.value = volumeSlider.value;
+    });
+
+    gainNode.gain.value = volumeSlider.value;
 
     const keys = "ASDFGHJKL".split("");
     const piano = document.getElementById("piano");
 
-    const createOscillator = (freq) => {
-      const osc = context.createOscillator();
-      const vol = context.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      vol.gain.value = volumeSlider.value;
-      osc.connect(vol).connect(gainNode);
-      return { osc, vol };
-    };
+    const keyStates = {};
 
     keys.forEach((keyChar, i) => {
       const key = document.createElement("div");
@@ -145,36 +163,63 @@
       key.textContent = keyChar;
       piano.appendChild(key);
 
-      const baseFreq = parseFloat(masterFreqSlider.value);
-      const keyFreq = baseFreq * Math.pow(2, i / 12);
-
       const playNote = () => {
-        const { osc } = createOscillator(keyFreq);
-        osc.start();
-        osc.stop(context.currentTime + 1);
+        const freq = parseFloat(masterFreqSlider.value) * Math.pow(2, i / 12);
+        const osc = context.createOscillator();
+        const amp = context.createGain();
+
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        osc.connect(amp).connect(gainNode);
+
+        const now = context.currentTime;
+        const attack = parseFloat(attackSlider.value);
+        const decay = parseFloat(decaySlider.value);
+        const sustain = parseFloat(sustainSlider.value);
+        const release = parseFloat(releaseSlider.value);
+
+        amp.gain.setValueAtTime(0, now);
+        amp.gain.linearRampToValueAtTime(volumeSlider.value, now + attack);
+        amp.gain.linearRampToValueAtTime(volumeSlider.value * sustain, now + attack + decay);
+
+        osc.start(now);
+        keyStates[keyChar] = { osc, amp, startedAt: now, release };
+      };
+
+      const stopNote = () => {
+        const note = keyStates[keyChar];
+        if (!note) return;
+
+        const now = context.currentTime;
+        note.amp.gain.cancelScheduledValues(now);
+        note.amp.gain.setValueAtTime(note.amp.gain.value, now);
+        note.amp.gain.linearRampToValueAtTime(0, now + note.release);
+        note.osc.stop(now + note.release);
+        delete keyStates[keyChar];
       };
 
       key.addEventListener("mousedown", () => {
         key.classList.add("pressed");
         playNote();
       });
-      key.addEventListener("mouseup", () => key.classList.remove("pressed"));
+      key.addEventListener("mouseup", () => {
+        key.classList.remove("pressed");
+        stopNote();
+      });
 
       window.addEventListener("keydown", (e) => {
-        if (e.key.toUpperCase() === keyChar) {
+        if (e.key.toUpperCase() === keyChar && !keyStates[keyChar]) {
           key.classList.add("pressed");
           playNote();
         }
       });
+
       window.addEventListener("keyup", (e) => {
         if (e.key.toUpperCase() === keyChar) {
           key.classList.remove("pressed");
+          stopNote();
         }
       });
-    });
-
-    volumeSlider.addEventListener("input", () => {
-      gainNode.gain.value = volumeSlider.value;
     });
 
     const oscCanvas = document.getElementById("oscilloscope");
