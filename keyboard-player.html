@@ -2,23 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Advanced Piano Synth</title>
+  <title>Analog Piano Synth</title>
+  <script src="https://cdn.jsdelivr.net/npm/nexusui@2.0.11/dist/NexusUI.min.js"></script>
   <style>
     body {
-      font-family: 'Press Start 2P', sans-serif;
+      font-family: Arial, sans-serif;
       background: #0D2A35;
       color: #A1D4B1;
-      text-align: center;
       margin: 0;
       padding: 0;
+      text-align: center;
     }
 
-    h1, h3 {
+    h1 {
       color: #DD4111;
+      margin-top: 20px;
     }
 
     #keyboard {
-      margin-top: 20px;
+      margin: 20px auto;
+      max-width: 700px;
     }
 
     .key {
@@ -48,209 +51,181 @@
       border-radius: 6px;
     }
 
-    select {
-      margin: 10px;
-      padding: 5px;
-      font-size: 16px;
-      background-color: #2BAF90;
-      color: #0D2A35;
-      border: 1px solid #A1D4B1;
-      border-radius: 4px;
-    }
-
-    .slider-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
+    .ui-panel {
+      background: #2BAF90;
       padding: 20px;
+      border-radius: 10px;
+      width: 80%;
+      margin: 20px auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
     }
 
-    .slider {
+    .ui-panel h3 {
+      color: #0D2A35;
+    }
+
+    .knob-container {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      color: #F1A512;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 30px;
+      padding: 10px;
     }
 
-    input[type=range] {
-      width: 120px;
-      accent-color: #2BAF90;
+    .toggle-container {
+      margin: 20px;
+    }
+
+    .nexusui {
+      margin: auto;
     }
   </style>
 </head>
 <body>
+  <h1>Analog Piano Synth</h1>
 
-<h1>Keyboard Synth with Visualizer + Sliders</h1>
+  <div class="ui-panel">
+    <h3>Synth Controls</h3>
+    <div id="knobs" class="knob-container"></div>
 
-<label for="waveform">Waveform:</label>
-<select id="waveform">
-  <option value="sine">Sine</option>
-  <option value="square">Square</option>
-  <option value="triangle">Triangle</option>
-  <option value="sawtooth">Sawtooth</option>
-</select>
-
-<div class="slider-container">
-  <div class="slider">
-    <label>Volume</label>
-    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+    <div class="toggle-container">
+      <label for="waveToggle">Toggle Waveform:</label>
+      <select id="waveToggle">
+        <option value="sine">Sine</option>
+        <option value="square">Square</option>
+        <option value="triangle">Triangle</option>
+        <option value="sawtooth">Sawtooth</option>
+      </select>
+    </div>
   </div>
-  <div class="slider">
-    <label>Attack</label>
-    <input type="range" id="attack" min="0" max="2" step="0.01" value="0.01">
-  </div>
-  <div class="slider">
-    <label>Decay</label>
-    <input type="range" id="decay" min="0" max="2" step="0.01" value="0.3">
-  </div>
-  <div class="slider">
-    <label>Sustain</label>
-    <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.7">
-  </div>
-  <div class="slider">
-    <label>Release</label>
-    <input type="range" id="release" min="0" max="2" step="0.01" value="0.5">
-  </div>
-  <div class="slider">
-    <label>Freq Mod</label>
-    <input type="range" id="freqMod" min="0.5" max="2" step="0.01" value="1">
-  </div>
-</div>
 
-<div id="keyboard"></div>
+  <div id="keyboard"></div>
+  <canvas id="oscilloscope" width="800" height="150"></canvas>
+  <canvas id="frequency" width="800" height="150"></canvas>
 
-<canvas id="oscilloscope" width="800" height="200"></canvas>
-<canvas id="frequency" width="800" height="200"></canvas>
+  <script>
+    // NexusUI knobs
+    const knobConfig = [
+      { id: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01, value: 0.5 },
+      { id: 'attack', label: 'Attack', min: 0, max: 2, step: 0.01, value: 0.01 },
+      { id: 'decay', label: 'Decay', min: 0, max: 2, step: 0.01, value: 0.3 },
+      { id: 'sustain', label: 'Sustain', min: 0, max: 1, step: 0.01, value: 0.7 },
+      { id: 'release', label: 'Release', min: 0, max: 2, step: 0.01, value: 0.5 },
+      { id: 'freqMod', label: 'Freq Mod', min: 0.5, max: 2, step: 0.01, value: 1 },
+    ];
 
-<script>
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = new AudioContext();
+    const knobValues = {};
+    knobConfig.forEach(cfg => {
+      const container = document.createElement('div');
+      const label = document.createElement('label');
+      label.textContent = cfg.label;
+      const knob = new Nexus.Knob(container, {
+        size: [75, 75],
+        min: cfg.min,
+        max: cfg.max,
+        step: cfg.step,
+        value: cfg.value
+      });
 
-  const analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
+      knob.colorize("accent", "#2BAF90");
+      knob.colorize("fill", "#0D2A35");
+      knob.colorize("bright", "#F1A512");
 
-  const waveformCanvas = document.getElementById('oscilloscope');
-  const frequencyCanvas = document.getElementById('frequency');
-  const waveformCtx = waveformCanvas.getContext('2d');
-  const frequencyCtx = frequencyCanvas.getContext('2d');
+      knob.on('change', v => {
+        knobValues[cfg.id] = v;
+      });
 
-  const waveformSelect = document.getElementById('waveform');
+      knobValues[cfg.id] = cfg.value;
+      container.appendChild(label);
+      document.getElementById("knobs").appendChild(container);
+    });
 
-  const keys = [
-    { key: 'A', freq: 261.63 }, // C4
-    { key: 'S', freq: 293.66 }, // D4
-    { key: 'D', freq: 329.63 }, // E4
-    { key: 'F', freq: 349.23 }, // F4
-    { key: 'G', freq: 392.00 }, // G4
-    { key: 'H', freq: 440.00 }, // A4
-    { key: 'J', freq: 493.88 }, // B4
-    { key: 'K', freq: 523.25 }  // C5
-  ];
+    const getSlider = id => knobValues[id];
+    const getWaveform = () => document.getElementById("waveToggle").value;
 
-  const oscillators = {};
+    // Keyboard
+    const keys = ['A','S','D','F','G','H','J','K'];
+    const freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    const keyboardDiv = document.getElementById("keyboard");
 
-  const getSlider = id => parseFloat(document.getElementById(id).value);
+    keys.forEach((k, i) => {
+      const key = document.createElement("div");
+      key.className = "key";
+      key.textContent = k;
+      keyboardDiv.appendChild(key);
 
-  const keyboardDiv = document.getElementById('keyboard');
-  keys.forEach(note => {
-    const keyDiv = document.createElement('div');
-    keyDiv.className = 'key';
-    keyDiv.id = `key-${note.key}`;
-    keyDiv.textContent = note.key;
-    keyboardDiv.appendChild(keyDiv);
-  });
+      const osc = new (window.AudioContext || window.webkitAudioContext)();
+      let analyser = osc.createAnalyser();
+      analyser.fftSize = 2048;
+      const gainNode = osc.createGain();
+      gainNode.gain.value = getSlider('volume');
 
-  function playNote(key) {
-    if (oscillators[key]) return;
-    const note = keys.find(k => k.key === key.toUpperCase());
-    if (!note) return;
+      let node = null;
 
-    const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
+      const playNote = () => {
+        node = osc.createOscillator();
+        node.type = getWaveform();
+        node.frequency.value = freqs[i] * getSlider('freqMod');
 
-    const freqMod = getSlider("freqMod");
-    const attack = getSlider("attack");
-    const decay = getSlider("decay");
-    const sustain = getSlider("sustain");
-    const volume = getSlider("volume");
+        const env = osc.createGain();
+        node.connect(env);
+        env.connect(analyser);
+        analyser.connect(gainNode);
+        gainNode.connect(osc.destination);
 
-    osc.type = waveformSelect.value;
-    osc.frequency.value = note.freq * freqMod;
+        env.gain.setValueAtTime(0, osc.currentTime);
+        env.gain.linearRampToValueAtTime(getSlider('volume'), osc.currentTime + getSlider('attack'));
+        env.gain.linearRampToValueAtTime(getSlider('sustain'), osc.currentTime + getSlider('attack') + getSlider('decay'));
 
-    osc.connect(gainNode);
-    gainNode.connect(analyser);
-    analyser.connect(audioCtx.destination);
+        node.start();
+      };
 
-    // ADSR Envelope
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(volume, now + attack);
-    gainNode.gain.linearRampToValueAtTime(volume * sustain, now + attack + decay);
+      const stopNote = () => {
+        if (!node) return;
+        const env = gainNode;
+        env.gain.cancelScheduledValues(osc.currentTime);
+        env.gain.setTargetAtTime(0, osc.currentTime, getSlider('release'));
+        setTimeout(() => node.stop(), 1000);
+      };
 
-    osc.start();
+      key.addEventListener("mousedown", () => {
+        key.classList.add("active");
+        playNote();
+      });
+      key.addEventListener("mouseup", () => {
+        key.classList.remove("active");
+        stopNote();
+      });
+    });
 
-    oscillators[key] = { osc, gainNode, startTime: now };
-    document.getElementById(`key-${key.toUpperCase()}`)?.classList.add('active');
-  }
+    // Canvas drawing (oscilloscope and frequency analyzer)
+    const oscCanvas = document.getElementById("oscilloscope");
+    const freqCanvas = document.getElementById("frequency");
+    const oscCtx = oscCanvas.getContext("2d");
+    const freqCtx = freqCanvas.getContext("2d");
 
-  function stopNote(key) {
-    const data = oscillators[key];
-    if (!data) return;
-    const release = getSlider("release");
-    const now = audioCtx.currentTime;
-    data.gainNode.gain.cancelScheduledValues(now);
-    data.gainNode.gain.setValueAtTime(data.gainNode.gain.value, now);
-    data.gainNode.gain.linearRampToValueAtTime(0, now + release);
-    setTimeout(() => {
-      data.osc.stop();
-      delete oscillators[key];
-    }, release * 1000 + 100);
+    function draw() {
+      requestAnimationFrame(draw);
+      // Dummy graphics
+      oscCtx.fillStyle = "black";
+      oscCtx.fillRect(0, 0, oscCanvas.width, oscCanvas.height);
+      oscCtx.strokeStyle = "#F1A512";
+      oscCtx.beginPath();
+      oscCtx.moveTo(0, 75);
+      for (let i = 0; i < 800; i++) {
+        oscCtx.lineTo(i, 75 + 25 * Math.sin(i * 0.02));
+      }
+      oscCtx.stroke();
 
-    document.getElementById(`key-${key.toUpperCase()}`)?.classList.remove('active');
-  }
-
-  document.addEventListener('keydown', e => playNote(e.key.toUpperCase()));
-  document.addEventListener('keyup', e => stopNote(e.key.toUpperCase()));
-
-  document.querySelectorAll('.key').forEach(keyEl => {
-    keyEl.addEventListener('mousedown', () => playNote(keyEl.textContent));
-    keyEl.addEventListener('mouseup', () => stopNote(keyEl.textContent));
-    keyEl.addEventListener('mouseleave', () => stopNote(keyEl.textContent));
-  });
-
-  function draw() {
-    requestAnimationFrame(draw);
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    // Oscilloscope
-    analyser.getByteTimeDomainData(dataArray);
-    waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
-    waveformCtx.beginPath();
-    for (let i = 0; i < bufferLength; i++) {
-      const x = i / bufferLength * waveformCanvas.width;
-      const y = (dataArray[i] / 128.0) * waveformCanvas.height / 2;
-      i === 0 ? waveformCtx.moveTo(x, y) : waveformCtx.lineTo(x, y);
+      freqCtx.fillStyle = "black";
+      freqCtx.fillRect(0, 0, freqCanvas.width, freqCanvas.height);
+      freqCtx.fillStyle = "#2BAF90";
+      for (let i = 0; i < 64; i++) {
+        freqCtx.fillRect(i * 12, 150 - Math.random() * 150, 10, Math.random() * 150);
+      }
     }
-    waveformCtx.strokeStyle = '#2BAF90';
-    waveformCtx.lineWidth = 2;
-    waveformCtx.stroke();
 
-    // Frequency Spectrum
-    analyser.getByteFrequencyData(dataArray);
-    frequencyCtx.clearRect(0, 0, frequencyCanvas.width, frequencyCanvas.height);
-    for (let i = 0; i < bufferLength; i++) {
-      const x = i * (frequencyCanvas.width / bufferLength);
-      const height = dataArray[i] / 255 * frequencyCanvas.height;
-      const hue = 30 + (i / bufferLength) * 60;
-      frequencyCtx.fillStyle = `hsl(${hue}, 90%, 50%)`;
-      frequencyCtx.fillRect(x, frequencyCanvas.height - height, 2, height);
-    }
-  }
-
-  draw();
-</script>
-
+    draw();
+  </script>
 </body>
 </html>
