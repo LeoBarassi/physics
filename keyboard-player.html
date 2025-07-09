@@ -1,148 +1,202 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Physics of Harmony · Interactive Keyboard</title>
-
-    <!-- ‑‑‑ Colour Palette ‑‑‑ -->
+<head>
+    <meta charset="UTF-8">
+    <title>Custom Color Piano Synth</title>
     <style>
-      :root {
-        --primary:   #2BAF90; /* green line */
-        --bg:        #0D2A35; /* page background */
-        --highlight: #F1A512; /* yellow bars */
-        --warn:      #DD4111; /* red harmonics */
-        --deep:      #8C0027; /* panel */
-        --accent:    #A1D4B1; /* input borders */
-        --text-light:#FFFFFF;
-        --text-muted:#B0BEC5;
-      }
-      *{box-sizing:border-box;}
-      body{
-        margin:0;
-        font-family:"Segoe UI",system-ui,sans-serif;
-        background:var(--bg);
-        color:var(--text-light);
-        display:flex;flex-direction:column;align-items:center;
-        padding:1rem;min-height:100vh;
-      }
-      /* ========= CONTROLS ========= */
-      #controls{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;background:var(--deep);padding:1rem 1.5rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);max-width:860px;width:100%;margin-bottom:2rem}
-      .control{display:flex;flex-direction:column;align-items:center;font-size:.85rem;color:var(--text-muted)}
-      .control input,.control select{background:var(--bg);color:var(--text-light);border:1px solid var(--accent);border-radius:8px;padding:.4rem .7rem;font-size:.9rem;margin-top:.35rem}
-      .control input[type=range]{width:120px;accent-color:var(--primary)}
-      /* ========= KEYBOARD ========= */
-      #keyboard{display:flex;gap:.25rem;overflow-x:auto;user-select:none;padding-bottom:1rem}
-      .white-key{position:relative;width:46px;height:180px;background:#fff;border-radius:6px;box-shadow:inset 0 -2px 4px rgba(0,0,0,.2),0 2px 4px rgba(0,0,0,.25);display:flex;justify-content:center;align-items:flex-end;font-size:.75rem;color:#333}
-      .black-key{position:absolute;left:30px;top:0;width:30px;height:110px;background:#111;border-radius:4px;z-index:2;box-shadow:inset 0 -2px 4px rgba(0,0,0,.5),0 2px 4px rgba(0,0,0,.25);color:#eee;display:flex;justify-content:center;align-items:flex-end;font-size:.55rem}
-      .key-active{background:var(--highlight)!important;color:var(--bg)!important}
-      /* ========= VISUALISER ========= */
-      #vis-wrapper{margin-top:2rem;width:100%;max-width:860px;background:var(--deep);padding:1rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.45)}
-      canvas{width:100%;height:160px;background:#000;border-radius:8px;display:block;margin-bottom:1rem}
-      #info{display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted)}
-      @media(max-width:620px){.white-key{width:34px;height:150px}.black-key{width:22px;left:22px;height:90px}}
-    </style>
-  </head>
-  <body>
-    <!-- ========= CONTROLS ========= -->
-    <div id="controls">
-      <div class="control">Waveform<select id="waveform"><option>sine</option><option>square</option><option>sawtooth</option><option>triangle</option></select></div>
-      <div class="control">Octaves<select id="octaveSpan"><option>1</option><option selected>2</option><option>3</option></select></div>
-      <div class="control">Detune<input type="range" id="detune" min="-200" max="200" value="0"></div>
-      <div class="control">Volume<input type="range" id="volume" min="0" max="100" value="70"></div>
-      <div class="control" style="margin-top:1.4rem"><label><input type="checkbox" id="poly"> Polyphonic</label></div>
-    </div>
-
-    <!-- ========= KEYBOARD ========= -->
-    <div id="keyboard"></div>
-
-    <!-- ========= VISUALISER ========= -->
-    <section id="vis-wrapper">
-      <canvas id="oscCanvas"></canvas>
-      <canvas id="fftCanvas"></canvas>
-      <div id="info"><span id="freqTxt">— Hz</span><span id="noteTxt">—</span></div>
-    </section>
-
-    <script>
-      /* ------- AUDIO SETUP ------- */
-      const AC = window.AudioContext||window.webkitAudioContext;
-      const ctx = new AC();
-      const master = ctx.createGain();
-      master.gain.value=.7;master.connect(ctx.destination);
-      const analyser = ctx.createAnalyser();analyser.fftSize=2048;master.connect(analyser);
-
-      /* ------- DOM LINKS ------- */
-      const kbEl  = document.getElementById('keyboard');
-      const waveSel=document.getElementById('waveform');
-      const octSel=document.getElementById('octaveSpan');
-      const detune=document.getElementById('detune');
-      const vol=document.getElementById('volume');
-      const poly=document.getElementById('poly');
-      const freqTxt=document.getElementById('freqTxt');
-      const noteTxt=document.getElementById('noteTxt');
-
-      /* ------- KEY MAPPING (2 oct row) ------- */
-      const physKeys="Q2W3ER5T6Y7U ZXCVBNM,./".replace(/\s/g,'').split(''); // 24 unique
-      const baseNotes=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-      const map={}; // physical key -> frequency
-      let oscillators={}; let currentFund=null;
-
-      function buildKeyboard(oct=2){kbEl.innerHTML='';Object.keys(map).forEach(k=>delete map[k]);
-        const startOct=4;let p=0;
-        for(let o=0;o<oct;o++){
-          baseNotes.forEach((note,i)=>{
-            const midi=12*(startOct+o)+i;const f=440*Math.pow(2,(midi-69)/12);
-            const phys=physKeys[p%physKeys.length];map[phys.toUpperCase()]=f;
-            if(!note.includes('#')){
-              const w=document.createElement('div');w.className='white-key key';w.dataset.freq=f;w.innerHTML=`<span>${phys}</span>`;kbEl.appendChild(w);
-              if(i+1<12&&baseNotes[i+1].includes('#')){
-                const b=document.createElement('div');b.className='black-key key';b.dataset.freq=f*Math.pow(2,1/12);b.innerHTML=`<span>${physKeys[(p+1)%physKeys.length]}</span>`;w.appendChild(b);
-              }
-            }
-            p++;
-          });
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #0D2A35;
+            color: #A1D4B1;
+            margin: 0;
+            padding: 0;
         }
-      }
-      buildKeyboard(2);
-      octSel.onchange=()=>buildKeyboard(parseInt(octSel.value));
 
-      /* ------- UTIL ------- */
-      function play(freq,el){if(!poly.checked){stopAll();}
-        const osc=ctx.createOscillator();osc.type=waveSel.value;osc.frequency.value=freq+Number(detune.value);
-        osc.connect(master);osc.start();osc.onended=()=>el.classList.remove('key-active');
-        oscillators[freq]=osc;el.classList.add('key-active');currentFund=freq;freqTxt.textContent=freq.toFixed(1)+' Hz';noteTxt.textContent=noteFromFreq(freq);
-      }
-      function stop(freq){if(oscillators[freq]){oscillators[freq].stop();delete oscillators[freq];}}
-      function stopAll(){Object.values(oscillators).forEach(o=>o.stop());oscillators={};document.querySelectorAll('.key-active').forEach(k=>k.classList.remove('key-active'));currentFund=null;}
-      function noteFromFreq(f){const n=Math.round(12*Math.log2(f/440))+69;return baseNotes[n%12]+Math.floor(n/12-1);} // crude
+        h1, h3 {
+            color: #F1A512;
+        }
 
-      /* ------- POINTER EVENTS ------- */
-      kbEl.addEventListener('mousedown',e=>{if(e.target.classList.contains('key'))play(+e.target.dataset.freq,e.target);});
-      window.addEventListener('mouseup',()=>{if(!poly.checked)stopAll();});
-      /* ------- KEYBOARD EVENTS ------- */
-      document.addEventListener('keydown',e=>{const f=map[e.key.toUpperCase()];if(f&&!e.repeat){const el=[...document.querySelectorAll('.key')].find(k=>+k.dataset.freq===f);play(f,el);}});
-      document.addEventListener('keyup',e=>{const f=map[e.key.toUpperCase()];if(f&&!poly.checked)stop(f);});
+        #keyboard {
+            margin-top: 20px;
+        }
 
-      /* ------- CONTROL BINDINGS ------- */
-      vol.oninput=()=>master.gain.value=vol.value/100;waveSel.onchange=()=>Object.values(oscillators).forEach(o=>o.type=waveSel.value);
+        .key {
+            display: inline-block;
+            width: 40px;
+            height: 150px;
+            margin: 1px;
+            background: #A1D4B1;
+            border: 2px solid #2BAF90;
+            color: #0D2A35;
+            line-height: 150px;
+            vertical-align: bottom;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
 
-      /* ------- VISUALISERS ------- */
-      const oscCtx=document.getElementById('oscCanvas').getContext('2d');
-      const fftCtx=document.getElementById('fftCanvas').getContext('2d');
+        .key.active {
+            background: #F1A512;
+            color: #0D2A35;
+        }
 
-      function draw(){requestAnimationFrame(draw);
-        const timeData=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(timeData);
-        oscCtx.clearRect(0,0,oscCtx.canvas.width,oscCtx.canvas.height);
-        oscCtx.beginPath();for(let i=0;i<timeData.length;i++){const x=i/timeData.length*oscCtx.canvas.width;const y=timeData[i]/255*oscCtx.canvas.height;i?oscCtx.lineTo(x,y):oscCtx.moveTo(x,y);}oscCtx.strokeStyle='var(--primary)';oscCtx.lineWidth=1.5;oscCtx.stroke();
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 2px solid #2BAF90;
+            background: #000;
+            border-radius: 6px;
+        }
 
-        const freqData=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(freqData);
-        fftCtx.clearRect(0,0,fftCtx.canvas.width,fftCtx.canvas.height);
-        const barW=fftCtx.canvas.width/freqData.length;
-        for(let i=0;i<freqData.length;i++){const h=freqData[i];fftCtx.fillStyle='var(--highlight)';fftCtx.fillRect(i*barW,fftCtx.canvas.height-h,barW*.85,h);}        
-        // harmonic overlays (red) if single fundamental
-        if(currentFund){const hzPerBin=ctx.sampleRate/2/freqData.length;for(let h=2;h<=6;h++){const idx=Math.round(currentFund*h/hzPerBin);if(idx<freqData.length){const x=idx*barW;fftCtx.strokeStyle='var(--warn)';fftCtx.beginPath();fftCtx.moveTo(x,0);fftCtx.lineTo(x,fftCtx.canvas.height);fftCtx.stroke();}}}
-      }
-      draw();
-    </script>
-  </body>
+        select {
+            margin: 10px;
+            padding: 5px;
+            font-size: 16px;
+            background-color: #2BAF90;
+            color: #0D2A35;
+            border: 1px solid #A1D4B1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Keyboard Synth with Visualizer</h1>
+
+<label for="waveform">Waveform:</label>
+<select id="waveform">
+    <option value="sine">Sine</option>
+    <option value="square">Square</option>
+    <option value="triangle">Triangle</option>
+    <option value="sawtooth">Sawtooth</option>
+</select>
+
+<div id="keyboard"></div>
+
+<canvas id="oscilloscope" width="800" height="200"></canvas>
+<canvas id="frequency" width="800" height="200"></canvas>
+
+<script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+
+    const waveformCanvas = document.getElementById('oscilloscope');
+    const frequencyCanvas = document.getElementById('frequency');
+    const waveformCtx = waveformCanvas.getContext('2d');
+    const frequencyCtx = frequencyCanvas.getContext('2d');
+
+    const waveformSelect = document.getElementById('waveform');
+
+    const keys = [
+        { key: 'A', freq: 261.63 }, // C4
+        { key: 'S', freq: 293.66 }, // D4
+        { key: 'D', freq: 329.63 }, // E4
+        { key: 'F', freq: 349.23 }, // F4
+        { key: 'G', freq: 392.00 }, // G4
+        { key: 'H', freq: 440.00 }, // A4
+        { key: 'J', freq: 493.88 }, // B4
+        { key: 'K', freq: 523.25 }  // C5
+    ];
+
+    const oscillators = {};
+
+    const keyboardDiv = document.getElementById('keyboard');
+    keys.forEach(note => {
+        const keyDiv = document.createElement('div');
+        keyDiv.className = 'key';
+        keyDiv.id = `key-${note.key}`;
+        keyDiv.textContent = note.key;
+        keyboardDiv.appendChild(keyDiv);
+    });
+
+    function playNote(key) {
+        if (oscillators[key]) return;
+
+        const note = keys.find(k => k.key === key.toUpperCase());
+        if (!note) return;
+
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        osc.type = waveformSelect.value;
+        osc.frequency.value = note.freq;
+        osc.connect(gainNode);
+        gainNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        osc.start();
+        oscillators[key] = { osc, gainNode };
+
+        document.getElementById(`key-${key.toUpperCase()}`)?.classList.add('active');
+    }
+
+    function stopNote(key) {
+        const oscData = oscillators[key];
+        if (oscData) {
+            oscData.gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.01);
+            setTimeout(() => {
+                oscData.osc.stop();
+                delete oscillators[key];
+            }, 100);
+        }
+
+        document.getElementById(`key-${key.toUpperCase()}`)?.classList.remove('active');
+    }
+
+    document.addEventListener('keydown', (e) => {
+        playNote(e.key.toUpperCase());
+    });
+
+    document.addEventListener('keyup', (e) => {
+        stopNote(e.key.toUpperCase());
+    });
+
+    // Mouse interaction
+    document.querySelectorAll('.key').forEach(keyEl => {
+        keyEl.addEventListener('mousedown', () => playNote(keyEl.textContent));
+        keyEl.addEventListener('mouseup', () => stopNote(keyEl.textContent));
+        keyEl.addEventListener('mouseleave', () => stopNote(keyEl.textContent));
+    });
+
+    function draw() {
+        requestAnimationFrame(draw);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        // Oscilloscope
+        analyser.getByteTimeDomainData(dataArray);
+        waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+        waveformCtx.beginPath();
+        for (let i = 0; i < bufferLength; i++) {
+            const x = i / bufferLength * waveformCanvas.width;
+            const y = (dataArray[i] / 128.0) * waveformCanvas.height / 2;
+            i === 0 ? waveformCtx.moveTo(x, y) : waveformCtx.lineTo(x, y);
+        }
+        waveformCtx.strokeStyle = '#2BAF90';
+        waveformCtx.lineWidth = 2;
+        waveformCtx.stroke();
+
+        // Frequency Spectrum
+        analyser.getByteFrequencyData(dataArray);
+        frequencyCtx.clearRect(0, 0, frequencyCanvas.width, frequencyCanvas.height);
+        for (let i = 0; i < bufferLength; i++) {
+            const x = i * (frequencyCanvas.width / bufferLength);
+            const height = dataArray[i] / 255 * frequencyCanvas.height;
+
+            const hue = 30 + (i / bufferLength) * 60; // Range from orange to red
+            frequencyCtx.fillStyle = `hsl(${hue}, 90%, 50%)`;
+            frequencyCtx.fillRect(x, frequencyCanvas.height - height, 2, height);
+        }
+    }
+
+    draw();
+</script>
+
+</body>
 </html>
