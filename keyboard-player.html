@@ -2,26 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Synth Piano Visualizer</title>
+  <title>Visualizer Piano Synth</title>
   <style>
     body {
       background: #0D2A35;
       color: #A1D4B1;
-      font-family: Arial, sans-serif;
+      font-family: sans-serif;
+      text-align: center;
       margin: 0;
       padding: 20px;
     }
 
     h1 {
       color: #F1A512;
-      text-align: center;
+      margin-bottom: 10px;
     }
 
     #piano {
       display: flex;
       justify-content: center;
-      margin: 20px 0;
+      margin: 20px auto;
+      flex-wrap: wrap;
     }
 
     .key {
@@ -30,63 +31,67 @@
       margin: 1px;
       background: #2BAF90;
       border: 1px solid #A1D4B1;
-      border-radius: 4px;
+      border-radius: 5px;
       cursor: pointer;
-      box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+      line-height: 150px;
+      color: #0D2A35;
+      font-weight: bold;
     }
 
     .key.pressed {
       background: #F1A512;
     }
 
+    canvas {
+      background: #001a21;
+      border: 2px solid #2BAF90;
+      margin: 15px auto;
+      display: block;
+    }
+
     .controls {
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 30px;
+      flex-wrap: wrap;
+      gap: 20px;
       margin-top: 30px;
     }
 
-    .slider-group {
+    .control-group {
       text-align: center;
-    }
-
-    input[type="range"] {
-      -webkit-appearance: none;
-      width: 100px;
-      height: 10px;
-      background: #A1D4B1;
-      border-radius: 5px;
-      outline: none;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      background: #DD4111;
-      border-radius: 50%;
-      cursor: pointer;
     }
 
     label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 5px;
+      font-size: 14px;
     }
 
-    canvas {
-      background: #001a21;
-      border: 1px solid #2BAF90;
-      display: block;
-      margin: 10px auto;
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 120px;
+      height: 10px;
+      background: linear-gradient(90deg, #8C0027, #DD4111, #F1A512, #2BAF90);
+      border-radius: 5px;
+      outline: none;
+      transition: background 0.3s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border: 2px solid #8C0027;
+      border-radius: 50%;
+      cursor: pointer;
     }
 
     select {
       background: #2BAF90;
       color: #0D2A35;
       border: none;
-      padding: 5px;
+      padding: 5px 10px;
       border-radius: 5px;
     }
   </style>
@@ -98,19 +103,7 @@
   <div id="piano"></div>
 
   <div class="controls">
-    <div class="slider-group">
-      <label for="volume">Volume</label>
-      <input id="volume" type="range" min="0" max="1" step="0.01" value="0.5" />
-    </div>
-    <div class="slider-group">
-      <label for="frequency">Frequency</label>
-      <input id="frequency" type="range" min="100" max="2000" step="10" value="440" />
-    </div>
-    <div class="slider-group">
-      <label for="detune">Detune</label>
-      <input id="detune" type="range" min="-100" max="100" step="1" value="0" />
-    </div>
-    <div class="slider-group">
+    <div class="control-group">
       <label for="waveform">Waveform</label>
       <select id="waveform">
         <option value="sine">Sine</option>
@@ -119,6 +112,23 @@
         <option value="sawtooth">Sawtooth</option>
       </select>
     </div>
+
+    <div class="control-group">
+      <label for="attack">Attack</label>
+      <input type="range" id="attack" min="0" max="2" step="0.01" value="0.1" />
+    </div>
+    <div class="control-group">
+      <label for="decay">Decay</label>
+      <input type="range" id="decay" min="0" max="2" step="0.01" value="0.2" />
+    </div>
+    <div class="control-group">
+      <label for="sustain">Sustain</label>
+      <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.7" />
+    </div>
+    <div class="control-group">
+      <label for="release">Release</label>
+      <input type="range" id="release" min="0" max="2" step="0.01" value="0.3" />
+    </div>
   </div>
 
   <canvas id="oscilloscope" width="800" height="150"></canvas>
@@ -126,76 +136,87 @@
 
   <script>
     const context = new (window.AudioContext || window.webkitAudioContext)();
-    let analyser = context.createAnalyser();
+    const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
-    let dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
     const gainNode = context.createGain();
     gainNode.connect(analyser).connect(context.destination);
 
-    const volumeSlider = document.getElementById('volume');
-    const frequencySlider = document.getElementById('frequency');
-    const detuneSlider = document.getElementById('detune');
-    const waveformSelect = document.getElementById('waveform');
+    const waveform = document.getElementById("waveform");
+    const attack = document.getElementById("attack");
+    const decay = document.getElementById("decay");
+    const sustain = document.getElementById("sustain");
+    const release = document.getElementById("release");
 
-    volumeSlider.oninput = () => {
-      gainNode.gain.value = volumeSlider.value;
-    };
+    const keys = "ASDFGHJKL".split("");
+    const piano = document.getElementById("piano");
 
-    let keys = 'ASDFGHJKL'.split('');
-    const pianoDiv = document.getElementById('piano');
+    keys.forEach((char, i) => {
+      const key = document.createElement("div");
+      key.className = "key";
+      key.textContent = char;
+      piano.appendChild(key);
 
-    keys.forEach((keyChar, index) => {
-      const key = document.createElement('div');
-      key.classList.add('key');
-      key.textContent = keyChar;
-      pianoDiv.appendChild(key);
-
-      const freq = 261.63 * Math.pow(2, index / 12); // C4 upward
+      const freq = 261.63 * Math.pow(2, i / 12); // C4 upward
 
       const playNote = () => {
         const osc = context.createOscillator();
-        osc.frequency.value = frequencySlider.value || freq;
-        osc.detune.value = parseFloat(detuneSlider.value);
-        osc.type = waveformSelect.value;
-        osc.connect(gainNode);
-        osc.start();
-        setTimeout(() => osc.stop(), 300);
+        const env = context.createGain();
+
+        osc.type = waveform.value;
+        osc.frequency.value = freq;
+
+        const now = context.currentTime;
+        const a = parseFloat(attack.value);
+        const d = parseFloat(decay.value);
+        const s = parseFloat(sustain.value);
+        const r = parseFloat(release.value);
+
+        env.gain.setValueAtTime(0, now);
+        env.gain.linearRampToValueAtTime(1, now + a);
+        env.gain.linearRampToValueAtTime(s, now + a + d);
+        env.gain.setValueAtTime(s, now + a + d);
+        env.gain.linearRampToValueAtTime(0, now + a + d + r);
+
+        osc.connect(env).connect(gainNode);
+        osc.start(now);
+        osc.stop(now + a + d + r + 0.1);
       };
 
-      key.addEventListener('mousedown', () => {
-        key.classList.add('pressed');
+      key.addEventListener("mousedown", () => {
+        key.classList.add("pressed");
         playNote();
       });
+      key.addEventListener("mouseup", () => key.classList.remove("pressed"));
 
-      key.addEventListener('mouseup', () => key.classList.remove('pressed'));
-
-      window.addEventListener('keydown', (e) => {
-        if (e.key.toUpperCase() === keyChar) {
-          key.classList.add('pressed');
+      window.addEventListener("keydown", (e) => {
+        if (e.key.toUpperCase() === char) {
+          key.classList.add("pressed");
           playNote();
         }
       });
-
-      window.addEventListener('keyup', (e) => {
-        if (e.key.toUpperCase() === keyChar) {
-          key.classList.remove('pressed');
+      window.addEventListener("keyup", (e) => {
+        if (e.key.toUpperCase() === char) {
+          key.classList.remove("pressed");
         }
       });
     });
 
     // Oscilloscope
-    const oscCanvas = document.getElementById('oscilloscope');
-    const oscCtx = oscCanvas.getContext('2d');
+    const oscCanvas = document.getElementById("oscilloscope");
+    const oscCtx = oscCanvas.getContext("2d");
 
     function drawOscilloscope() {
       requestAnimationFrame(drawOscilloscope);
       analyser.getByteTimeDomainData(dataArray);
-      oscCtx.fillStyle = '#0D2A35';
+      oscCtx.fillStyle = "#001a21";
       oscCtx.fillRect(0, 0, oscCanvas.width, oscCanvas.height);
+
       oscCtx.lineWidth = 2;
-      oscCtx.strokeStyle = '#F1A512';
+      oscCtx.strokeStyle = "#F1A512";
       oscCtx.beginPath();
+
       const sliceWidth = oscCanvas.width / dataArray.length;
       let x = 0;
       for (let i = 0; i < dataArray.length; i++) {
@@ -213,29 +234,36 @@
     }
 
     // Frequency Spectrum
-    const freqCanvas = document.getElementById('frequency');
-    const freqCtx = freqCanvas.getContext('2d');
+    const freqCanvas = document.getElementById("frequency");
+    const freqCtx = freqCanvas.getContext("2d");
 
     function drawFrequency() {
       requestAnimationFrame(drawFrequency);
       analyser.getByteFrequencyData(dataArray);
-      freqCtx.fillStyle = '#0D2A35';
+      freqCtx.fillStyle = "#001a21";
       freqCtx.fillRect(0, 0, freqCanvas.width, freqCanvas.height);
+
       const barWidth = (freqCanvas.width / dataArray.length) * 2.5;
       let x = 0;
       for (let i = 0; i < dataArray.length; i++) {
         const barHeight = dataArray[i];
-        freqCtx.fillStyle = '#2BAF90';
+        freqCtx.fillStyle = "#2BAF90";
         freqCtx.fillRect(x, freqCanvas.height - barHeight / 2, barWidth, barHeight / 2);
         x += barWidth + 1;
       }
     }
+
+    // Color shifting slider
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+      slider.addEventListener('input', () => {
+        const percent = (slider.value - slider.min) / (slider.max - slider.min);
+        const hue = 120 - percent * 120; // green to red
+        slider.style.background = `linear-gradient(to right, hsl(${hue}, 80%, 50%), #2BAF90)`;
+      });
+    });
 
     drawOscilloscope();
     drawFrequency();
   </script>
 </body>
 </html>
-
-</html>
-
