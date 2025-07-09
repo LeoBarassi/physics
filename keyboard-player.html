@@ -2,113 +2,117 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Web Synth Piano</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- NexusUI for analog knobs -->
-  <script src="https://unpkg.com/nexusui@2.0.11/dist/NexusUI.min.js"></script>
-
-
-  <!-- Styling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Synth Piano Visualizer</title>
   <style>
     body {
-      margin: 0;
-      font-family: sans-serif;
-      background-color: #0D2A35;
+      background: #0D2A35;
       color: #A1D4B1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      font-family: Arial, sans-serif;
+      margin: 0;
       padding: 20px;
     }
 
-    #keyboard {
+    h1 {
+      color: #F1A512;
+      text-align: center;
+    }
+
+    #piano {
       display: flex;
-      margin-bottom: 20px;
+      justify-content: center;
+      margin: 20px 0;
     }
 
     .key {
       width: 40px;
       height: 150px;
       margin: 1px;
-      background-color: #2BAF90;
-      border: 1px solid #F1A512;
+      background: #2BAF90;
+      border: 1px solid #A1D4B1;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+    }
+
+    .key.pressed {
+      background: #F1A512;
+    }
+
+    .controls {
       display: flex;
-      align-items: flex-end;
+      flex-wrap: wrap;
       justify-content: center;
-      font-size: 12px;
-      color: #0D2A35;
+      gap: 30px;
+      margin-top: 30px;
+    }
+
+    .slider-group {
+      text-align: center;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 10px;
+      background: #A1D4B1;
+      border-radius: 5px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #DD4111;
+      border-radius: 50%;
       cursor: pointer;
     }
 
-    .key.active {
-      background-color: #F1A512;
-      color: #0D2A35;
+    label {
+      display: block;
+      margin-bottom: 8px;
     }
 
     canvas {
-      background-color: #fff;
-      margin: 10px 0;
-      border: 2px solid #2BAF90;
-    }
-
-    #controls {
-      display: flex;
-      gap: 40px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-top: 20px;
-    }
-
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      color: #F1A512;
+      background: #001a21;
+      border: 1px solid #2BAF90;
+      display: block;
+      margin: 10px auto;
     }
 
     select {
-      padding: 5px;
-      background-color: #2BAF90;
+      background: #2BAF90;
       color: #0D2A35;
       border: none;
-      font-size: 16px;
+      padding: 5px;
+      border-radius: 5px;
     }
-
   </style>
 </head>
 <body>
 
-  <h1>🎹 Web Synth Piano</h1>
+  <h1>Synth Piano Visualizer</h1>
 
-  <!-- Piano keys -->
-  <div id="keyboard"></div>
+  <div id="piano"></div>
 
-  <!-- Visualizers -->
-  <canvas id="oscilloscope" width="600" height="150"></canvas>
-  <canvas id="spectrum" width="600" height="150"></canvas>
-
-  <!-- Controls -->
-  <div id="controls">
-    <div class="control-group">
-      <label>Volume</label>
-      <div id="volumeKnob"></div>
+  <div class="controls">
+    <div class="slider-group">
+      <label for="volume">Volume</label>
+      <input id="volume" type="range" min="0" max="1" step="0.01" value="0.5" />
     </div>
-    <div class="control-group">
-      <label>Frequency</label>
-      <div id="freqKnob"></div>
+    <div class="slider-group">
+      <label for="frequency">Frequency</label>
+      <input id="frequency" type="range" min="100" max="2000" step="10" value="440" />
     </div>
-    <div class="control-group">
-      <label>Attack</label>
-      <div id="attackKnob"></div>
+    <div class="slider-group">
+      <label for="detune">Detune</label>
+      <input id="detune" type="range" min="-100" max="100" step="1" value="0" />
     </div>
-    <div class="control-group">
-      <label>Release</label>
-      <div id="releaseKnob"></div>
-    </div>
-    <div class="control-group">
-      <label>Waveform</label>
-      <select id="waveformSelect">
+    <div class="slider-group">
+      <label for="waveform">Waveform</label>
+      <select id="waveform">
         <option value="sine">Sine</option>
         <option value="square">Square</option>
         <option value="triangle">Triangle</option>
@@ -117,138 +121,121 @@
     </div>
   </div>
 
-  <!-- Script -->
+  <canvas id="oscilloscope" width="800" height="150"></canvas>
+  <canvas id="frequency" width="800" height="150"></canvas>
+
   <script>
-    window.onload = function () {
-      const keyMap = ['a','s','d','f','g','h','j','k'];
-      const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]; // C4 to C5
-      const keyboardDiv = document.getElementById('keyboard');
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    let analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    let dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-      let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      let masterGain = audioCtx.createGain();
-      masterGain.connect(audioCtx.destination);
-      masterGain.gain.value = 0.5;
+    const gainNode = context.createGain();
+    gainNode.connect(analyser).connect(context.destination);
 
-      let currentWaveform = 'sine';
-      let attackTime = 0.05;
-      let releaseTime = 0.3;
+    const volumeSlider = document.getElementById('volume');
+    const frequencySlider = document.getElementById('frequency');
+    const detuneSlider = document.getElementById('detune');
+    const waveformSelect = document.getElementById('waveform');
 
-      let analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      masterGain.connect(analyser);
-      let oscilloscope = document.getElementById('oscilloscope');
-      let oscCtx = oscilloscope.getContext('2d');
+    volumeSlider.oninput = () => {
+      gainNode.gain.value = volumeSlider.value;
+    };
 
-      let freqCanvas = document.getElementById('spectrum');
-      let freqCtx = freqCanvas.getContext('2d');
+    let keys = 'ASDFGHJKL'.split('');
+    const pianoDiv = document.getElementById('piano');
 
-      function playNote(freq) {
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
+    keys.forEach((keyChar, index) => {
+      const key = document.createElement('div');
+      key.classList.add('key');
+      key.textContent = keyChar;
+      pianoDiv.appendChild(key);
 
-        osc.type = currentWaveform;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      const freq = 261.63 * Math.pow(2, index / 12); // C4 upward
 
-        gain.gain.setValueAtTime(0, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + attackTime);
-        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + attackTime + releaseTime);
-
-        osc.connect(gain);
-        gain.connect(masterGain);
-
+      const playNote = () => {
+        const osc = context.createOscillator();
+        osc.frequency.value = frequencySlider.value || freq;
+        osc.detune.value = parseFloat(detuneSlider.value);
+        osc.type = waveformSelect.value;
+        osc.connect(gainNode);
         osc.start();
-        osc.stop(audioCtx.currentTime + attackTime + releaseTime);
-      }
+        setTimeout(() => osc.stop(), 300);
+      };
 
-      keyMap.forEach((k, i) => {
-        const key = document.createElement('div');
-        key.className = 'key';
-        key.textContent = k.toUpperCase();
-        keyboardDiv.appendChild(key);
-
-        document.addEventListener('keydown', e => {
-          if (e.key === k) {
-            key.classList.add('active');
-            playNote(notes[i]);
-          }
-        });
-        document.addEventListener('keyup', e => {
-          if (e.key === k) key.classList.remove('active');
-        });
-
-        key.onclick = () => {
-          key.classList.add('active');
-          playNote(notes[i]);
-          setTimeout(() => key.classList.remove('active'), 200);
-        };
+      key.addEventListener('mousedown', () => {
+        key.classList.add('pressed');
+        playNote();
       });
 
-      function drawOscilloscope() {
-        requestAnimationFrame(drawOscilloscope);
-        const bufferLength = analyser.fftSize;
-        const dataArray = new Uint8Array(bufferLength);
-        analyser.getByteTimeDomainData(dataArray);
+      key.addEventListener('mouseup', () => key.classList.remove('pressed'));
 
-        oscCtx.fillStyle = "#ffffff";
-        oscCtx.fillRect(0, 0, oscilloscope.width, oscilloscope.height);
-        oscCtx.lineWidth = 2;
-        oscCtx.strokeStyle = "#DD4111";
-        oscCtx.beginPath();
-
-        let sliceWidth = oscilloscope.width * 1.0 / bufferLength;
-        let x = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          let v = dataArray[i] / 128.0;
-          let y = v * oscilloscope.height / 2;
-          if (i === 0) oscCtx.moveTo(x, y);
-          else oscCtx.lineTo(x, y);
-          x += sliceWidth;
+      window.addEventListener('keydown', (e) => {
+        if (e.key.toUpperCase() === keyChar) {
+          key.classList.add('pressed');
+          playNote();
         }
-        oscCtx.lineTo(oscilloscope.width, oscilloscope.height / 2);
-        oscCtx.stroke();
-      }
+      });
 
-      function drawSpectrum() {
-        requestAnimationFrame(drawSpectrum);
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        analyser.getByteFrequencyData(dataArray);
-
-        freqCtx.fillStyle = "#ffffff";
-        freqCtx.fillRect(0, 0, freqCanvas.width, freqCanvas.height);
-
-        const barWidth = (freqCanvas.width / bufferLength) * 2.5;
-        let x = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-          let barHeight = dataArray[i];
-          freqCtx.fillStyle = "#8C0027";
-          freqCtx.fillRect(x, freqCanvas.height - barHeight / 2, barWidth, barHeight / 2);
-          x += barWidth + 1;
+      window.addEventListener('keyup', (e) => {
+        if (e.key.toUpperCase() === keyChar) {
+          key.classList.remove('pressed');
         }
+      });
+    });
+
+    // Oscilloscope
+    const oscCanvas = document.getElementById('oscilloscope');
+    const oscCtx = oscCanvas.getContext('2d');
+
+    function drawOscilloscope() {
+      requestAnimationFrame(drawOscilloscope);
+      analyser.getByteTimeDomainData(dataArray);
+      oscCtx.fillStyle = '#0D2A35';
+      oscCtx.fillRect(0, 0, oscCanvas.width, oscCanvas.height);
+      oscCtx.lineWidth = 2;
+      oscCtx.strokeStyle = '#F1A512';
+      oscCtx.beginPath();
+      const sliceWidth = oscCanvas.width / dataArray.length;
+      let x = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * oscCanvas.height) / 2;
+        if (i === 0) {
+          oscCtx.moveTo(x, y);
+        } else {
+          oscCtx.lineTo(x, y);
+        }
+        x += sliceWidth;
       }
+      oscCtx.lineTo(oscCanvas.width, oscCanvas.height / 2);
+      oscCtx.stroke();
+    }
 
-      drawOscilloscope();
-      drawSpectrum();
+    // Frequency Spectrum
+    const freqCanvas = document.getElementById('frequency');
+    const freqCtx = freqCanvas.getContext('2d');
 
-      // NexusUI knobs
-      const volumeKnob = new Nexus.Dial('#volumeKnob', { min: 0, max: 1, value: 0.5 });
-      volumeKnob.on('change', v => masterGain.gain.value = v);
+    function drawFrequency() {
+      requestAnimationFrame(drawFrequency);
+      analyser.getByteFrequencyData(dataArray);
+      freqCtx.fillStyle = '#0D2A35';
+      freqCtx.fillRect(0, 0, freqCanvas.width, freqCanvas.height);
+      const barWidth = (freqCanvas.width / dataArray.length) * 2.5;
+      let x = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const barHeight = dataArray[i];
+        freqCtx.fillStyle = '#2BAF90';
+        freqCtx.fillRect(x, freqCanvas.height - barHeight / 2, barWidth, barHeight / 2);
+        x += barWidth + 1;
+      }
+    }
 
-      const freqKnob = new Nexus.Dial('#freqKnob', { min: 200, max: 1000, value: 440 });
-      freqKnob.on('change', v => notes[5] = v); // Adjust 'A' note dynamically
-
-      const attackKnob = new Nexus.Dial('#attackKnob', { min: 0.01, max: 1, value: 0.05 });
-      attackKnob.on('change', v => attackTime = v);
-
-      const releaseKnob = new Nexus.Dial('#releaseKnob', { min: 0.1, max: 2, value: 0.3 });
-      releaseKnob.on('change', v => releaseTime = v);
-
-      // Waveform selector
-      const waveformSelect = document.getElementById('waveformSelect');
-      waveformSelect.addEventListener('change', e => currentWaveform = e.target.value);
-    };
+    drawOscilloscope();
+    drawFrequency();
   </script>
 </body>
+</html>
+
 </html>
 
