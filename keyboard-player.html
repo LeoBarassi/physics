@@ -15,7 +15,7 @@
     }
 
     h1 {
-      color: #DD4111;
+      color: #F1A512;
       margin-top: 20px;
     }
 
@@ -104,7 +104,13 @@
   <canvas id="frequency" width="800" height="150"></canvas>
 
   <script>
-    // NexusUI knobs
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    const gainNode = audioCtx.createGain();
+    analyser.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
     const knobConfig = [
       { id: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01, value: 0.5 },
       { id: 'attack', label: 'Attack', min: 0, max: 2, step: 0.01, value: 0.01 },
@@ -126,102 +132,99 @@
         step: cfg.step,
         value: cfg.value
       });
-
       knob.colorize("accent", "#2BAF90");
       knob.colorize("fill", "#0D2A35");
       knob.colorize("bright", "#F1A512");
-
-      knob.on('change', v => {
-        knobValues[cfg.id] = v;
-      });
-
+      knob.on('change', v => { knobValues[cfg.id] = v; });
       knobValues[cfg.id] = cfg.value;
       container.appendChild(label);
       document.getElementById("knobs").appendChild(container);
     });
 
-    const getSlider = id => knobValues[id];
     const getWaveform = () => document.getElementById("waveToggle").value;
 
-    // Keyboard
-    const keys = ['A','S','D','F','G','H','J','K'];
+    const keys = ['a','s','d','f','g','h','j','k'];
     const freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    const keyMap = {};
+
     const keyboardDiv = document.getElementById("keyboard");
 
-    keys.forEach((k, i) => {
-      const key = document.createElement("div");
-      key.className = "key";
-      key.textContent = k;
-      keyboardDiv.appendChild(key);
-
-      const osc = new (window.AudioContext || window.webkitAudioContext)();
-      let analyser = osc.createAnalyser();
-      analyser.fftSize = 2048;
-      const gainNode = osc.createGain();
-      gainNode.gain.value = getSlider('volume');
-
-      let node = null;
-
-      const playNote = () => {
-        node = osc.createOscillator();
-        node.type = getWaveform();
-        node.frequency.value = freqs[i] * getSlider('freqMod');
-
-        const env = osc.createGain();
-        node.connect(env);
-        env.connect(analyser);
-        analyser.connect(gainNode);
-        gainNode.connect(osc.destination);
-
-        env.gain.setValueAtTime(0, osc.currentTime);
-        env.gain.linearRampToValueAtTime(getSlider('volume'), osc.currentTime + getSlider('attack'));
-        env.gain.linearRampToValueAtTime(getSlider('sustain'), osc.currentTime + getSlider('attack') + getSlider('decay'));
-
-        node.start();
-      };
-
-      const stopNote = () => {
-        if (!node) return;
-        const env = gainNode;
-        env.gain.cancelScheduledValues(osc.currentTime);
-        env.gain.setTargetAtTime(0, osc.currentTime, getSlider('release'));
-        setTimeout(() => node.stop(), 1000);
-      };
-
-      key.addEventListener("mousedown", () => {
-        key.classList.add("active");
-        playNote();
-      });
-      key.addEventListener("mouseup", () => {
-        key.classList.remove("active");
-        stopNote();
-      });
+    keys.forEach((key, i) => {
+      const el = document.createElement("div");
+      el.className = "key";
+      el.textContent = key.toUpperCase();
+      keyboardDiv.appendChild(el);
+      keyMap[key] = { freq: freqs[i], el };
     });
 
-    // Canvas drawing (oscilloscope and frequency analyzer)
+    let activeOscs = {};
+
+    function playNote(key) {
+      if (!keyMap[key] || activeOscs[key]) return;
+      const osc = audioCtx.createOscillator();
+      const env = audioCtx.createGain();
+
+      osc.type = getWaveform();
+      osc.frequency.value = keyMap[key].freq * knobValues.freqMod;
+      keyMap[key].el.classList.add("active");
+
+      osc.connect(env);
+      env.connect(analyser);
+
+      const now = audioCtx.currentTime;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(knobValues.volume, now + knobValues.attack);
+      env.gain.linearRampToValueAtTime(knobValues.sustain, now + knobValues.attack + knobValues.decay);
+
+      osc.start(now);
+      activeOscs[key] = { osc, env };
+    }
+
+    function stopNote(key) {
+      const data = activeOscs[key];
+      if (!data) return;
+      const now = audioCtx.currentTime;
+      data.env.gain.cancelScheduledValues(now);
+      data.env.gain.setTargetAtTime(0, now, knobValues.release);
+      data.osc.stop(now + knobValues.release + 0.1);
+      keyMap[key].el.classList.remove("active");
+      delete activeOscs[key];
+    }
+
+    document.addEventListener("keydown", e => playNote(e.key));
+    document.addEventListener("keyup", e => stopNote(e.key));
+
     const oscCanvas = document.getElementById("oscilloscope");
     const freqCanvas = document.getElementById("frequency");
     const oscCtx = oscCanvas.getContext("2d");
     const freqCtx = freqCanvas.getContext("2d");
+    const timeData = new Uint8Array(analyser.fftSize);
+    const freqData = new Uint8Array(analyser.frequencyBinCount);
 
     function draw() {
       requestAnimationFrame(draw);
-      // Dummy graphics
-      oscCtx.fillStyle = "black";
+
+      analyser.getByteTimeDomainData(timeData);
+      oscCtx.fillStyle = "#000";
       oscCtx.fillRect(0, 0, oscCanvas.width, oscCanvas.height);
       oscCtx.strokeStyle = "#F1A512";
       oscCtx.beginPath();
-      oscCtx.moveTo(0, 75);
-      for (let i = 0; i < 800; i++) {
-        oscCtx.lineTo(i, 75 + 25 * Math.sin(i * 0.02));
+      for (let i = 0; i < timeData.length; i++) {
+        let x = i / timeData.length * oscCanvas.width;
+        let y = timeData[i] / 255 * oscCanvas.height;
+        if (i === 0) oscCtx.moveTo(x, y);
+        else oscCtx.lineTo(x, y);
       }
       oscCtx.stroke();
 
-      freqCtx.fillStyle = "black";
+      analyser.getByteFrequencyData(freqData);
+      freqCtx.fillStyle = "#000";
       freqCtx.fillRect(0, 0, freqCanvas.width, freqCanvas.height);
       freqCtx.fillStyle = "#2BAF90";
-      for (let i = 0; i < 64; i++) {
-        freqCtx.fillRect(i * 12, 150 - Math.random() * 150, 10, Math.random() * 150);
+      for (let i = 0; i < freqData.length; i++) {
+        let x = i / freqData.length * freqCanvas.width;
+        let y = freqCanvas.height - (freqData[i] / 255 * freqCanvas.height);
+        freqCtx.fillRect(x, y, 2, freqCanvas.height - y);
       }
     }
 
