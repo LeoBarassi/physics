@@ -1,77 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Custom Color Piano Synth</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background: #0D2A35;
-            color: #A1D4B1;
-            margin: 0;
-            padding: 0;
-        }
+  <meta charset="UTF-8" />
+  <title>Advanced Piano Synth</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0D2A35;
+      color: #A1D4B1;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
 
-        h1, h3 {
-            color: #F1A512;
-        }
+    h1, h3 {
+      color: #F1A512;
+    }
 
-        #keyboard {
-            margin-top: 20px;
-        }
+    #keyboard {
+      margin-top: 20px;
+    }
 
-        .key {
-            display: inline-block;
-            width: 40px;
-            height: 150px;
-            margin: 1px;
-            background: #A1D4B1;
-            border: 2px solid #2BAF90;
-            color: #0D2A35;
-            line-height: 150px;
-            vertical-align: bottom;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: background 0.2s ease;
-        }
+    .key {
+      display: inline-block;
+      width: 40px;
+      height: 150px;
+      margin: 1px;
+      background: #A1D4B1;
+      border: 2px solid #2BAF90;
+      color: #0D2A35;
+      line-height: 150px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
 
-        .key.active {
-            background: #F1A512;
-            color: #0D2A35;
-        }
+    .key.active {
+      background: #F1A512;
+    }
 
-        canvas {
-            display: block;
-            margin: 20px auto;
-            border: 2px solid #2BAF90;
-            background: #000;
-            border-radius: 6px;
-        }
+    canvas {
+      display: block;
+      margin: 20px auto;
+      border: 2px solid #2BAF90;
+      background: #000;
+      border-radius: 6px;
+    }
 
-        select {
-            margin: 10px;
-            padding: 5px;
-            font-size: 16px;
-            background-color: #2BAF90;
-            color: #0D2A35;
-            border: 1px solid #A1D4B1;
-            border-radius: 4px;
-        }
-    </style>
+    select {
+      margin: 10px;
+      padding: 5px;
+      font-size: 16px;
+      background-color: #2BAF90;
+      color: #0D2A35;
+      border: 1px solid #A1D4B1;
+      border-radius: 4px;
+    }
+
+    .slider-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .slider {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #F1A512;
+    }
+
+    input[type=range] {
+      width: 120px;
+      accent-color: #2BAF90;
+    }
+  </style>
 </head>
 <body>
 
-<h1>Keyboard Synth with Visualizer</h1>
+<h1>Keyboard Synth with Visualizer + Sliders</h1>
 
 <label for="waveform">Waveform:</label>
 <select id="waveform">
-    <option value="sine">Sine</option>
-    <option value="square">Square</option>
-    <option value="triangle">Triangle</option>
-    <option value="sawtooth">Sawtooth</option>
+  <option value="sine">Sine</option>
+  <option value="square">Square</option>
+  <option value="triangle">Triangle</option>
+  <option value="sawtooth">Sawtooth</option>
 </select>
+
+<div class="slider-container">
+  <div class="slider">
+    <label>Volume</label>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+  </div>
+  <div class="slider">
+    <label>Attack</label>
+    <input type="range" id="attack" min="0" max="2" step="0.01" value="0.01">
+  </div>
+  <div class="slider">
+    <label>Decay</label>
+    <input type="range" id="decay" min="0" max="2" step="0.01" value="0.3">
+  </div>
+  <div class="slider">
+    <label>Sustain</label>
+    <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.7">
+  </div>
+  <div class="slider">
+    <label>Release</label>
+    <input type="range" id="release" min="0" max="2" step="0.01" value="0.5">
+  </div>
+  <div class="slider">
+    <label>Freq Mod</label>
+    <input type="range" id="freqMod" min="0.5" max="2" step="0.01" value="1">
+  </div>
+</div>
 
 <div id="keyboard"></div>
 
@@ -79,123 +124,132 @@
 <canvas id="frequency" width="800" height="200"></canvas>
 
 <script>
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
 
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
 
-    const waveformCanvas = document.getElementById('oscilloscope');
-    const frequencyCanvas = document.getElementById('frequency');
-    const waveformCtx = waveformCanvas.getContext('2d');
-    const frequencyCtx = frequencyCanvas.getContext('2d');
+  const waveformCanvas = document.getElementById('oscilloscope');
+  const frequencyCanvas = document.getElementById('frequency');
+  const waveformCtx = waveformCanvas.getContext('2d');
+  const frequencyCtx = frequencyCanvas.getContext('2d');
 
-    const waveformSelect = document.getElementById('waveform');
+  const waveformSelect = document.getElementById('waveform');
 
-    const keys = [
-        { key: 'A', freq: 261.63 }, // C4
-        { key: 'S', freq: 293.66 }, // D4
-        { key: 'D', freq: 329.63 }, // E4
-        { key: 'F', freq: 349.23 }, // F4
-        { key: 'G', freq: 392.00 }, // G4
-        { key: 'H', freq: 440.00 }, // A4
-        { key: 'J', freq: 493.88 }, // B4
-        { key: 'K', freq: 523.25 }  // C5
-    ];
+  const keys = [
+    { key: 'A', freq: 261.63 }, // C4
+    { key: 'S', freq: 293.66 }, // D4
+    { key: 'D', freq: 329.63 }, // E4
+    { key: 'F', freq: 349.23 }, // F4
+    { key: 'G', freq: 392.00 }, // G4
+    { key: 'H', freq: 440.00 }, // A4
+    { key: 'J', freq: 493.88 }, // B4
+    { key: 'K', freq: 523.25 }  // C5
+  ];
 
-    const oscillators = {};
+  const oscillators = {};
 
-    const keyboardDiv = document.getElementById('keyboard');
-    keys.forEach(note => {
-        const keyDiv = document.createElement('div');
-        keyDiv.className = 'key';
-        keyDiv.id = `key-${note.key}`;
-        keyDiv.textContent = note.key;
-        keyboardDiv.appendChild(keyDiv);
-    });
+  const getSlider = id => parseFloat(document.getElementById(id).value);
 
-    function playNote(key) {
-        if (oscillators[key]) return;
+  const keyboardDiv = document.getElementById('keyboard');
+  keys.forEach(note => {
+    const keyDiv = document.createElement('div');
+    keyDiv.className = 'key';
+    keyDiv.id = `key-${note.key}`;
+    keyDiv.textContent = note.key;
+    keyboardDiv.appendChild(keyDiv);
+  });
 
-        const note = keys.find(k => k.key === key.toUpperCase());
-        if (!note) return;
+  function playNote(key) {
+    if (oscillators[key]) return;
+    const note = keys.find(k => k.key === key.toUpperCase());
+    if (!note) return;
 
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
 
-        osc.type = waveformSelect.value;
-        osc.frequency.value = note.freq;
-        osc.connect(gainNode);
-        gainNode.connect(analyser);
-        analyser.connect(audioCtx.destination);
+    const freqMod = getSlider("freqMod");
+    const attack = getSlider("attack");
+    const decay = getSlider("decay");
+    const sustain = getSlider("sustain");
+    const volume = getSlider("volume");
 
-        osc.start();
-        oscillators[key] = { osc, gainNode };
+    osc.type = waveformSelect.value;
+    osc.frequency.value = note.freq * freqMod;
 
-        document.getElementById(`key-${key.toUpperCase()}`)?.classList.add('active');
+    osc.connect(gainNode);
+    gainNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
+
+    // ADSR Envelope
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(volume, now + attack);
+    gainNode.gain.linearRampToValueAtTime(volume * sustain, now + attack + decay);
+
+    osc.start();
+
+    oscillators[key] = { osc, gainNode, startTime: now };
+    document.getElementById(`key-${key.toUpperCase()}`)?.classList.add('active');
+  }
+
+  function stopNote(key) {
+    const data = oscillators[key];
+    if (!data) return;
+    const release = getSlider("release");
+    const now = audioCtx.currentTime;
+    data.gainNode.gain.cancelScheduledValues(now);
+    data.gainNode.gain.setValueAtTime(data.gainNode.gain.value, now);
+    data.gainNode.gain.linearRampToValueAtTime(0, now + release);
+    setTimeout(() => {
+      data.osc.stop();
+      delete oscillators[key];
+    }, release * 1000 + 100);
+
+    document.getElementById(`key-${key.toUpperCase()}`)?.classList.remove('active');
+  }
+
+  document.addEventListener('keydown', e => playNote(e.key.toUpperCase()));
+  document.addEventListener('keyup', e => stopNote(e.key.toUpperCase()));
+
+  document.querySelectorAll('.key').forEach(keyEl => {
+    keyEl.addEventListener('mousedown', () => playNote(keyEl.textContent));
+    keyEl.addEventListener('mouseup', () => stopNote(keyEl.textContent));
+    keyEl.addEventListener('mouseleave', () => stopNote(keyEl.textContent));
+  });
+
+  function draw() {
+    requestAnimationFrame(draw);
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    // Oscilloscope
+    analyser.getByteTimeDomainData(dataArray);
+    waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+    waveformCtx.beginPath();
+    for (let i = 0; i < bufferLength; i++) {
+      const x = i / bufferLength * waveformCanvas.width;
+      const y = (dataArray[i] / 128.0) * waveformCanvas.height / 2;
+      i === 0 ? waveformCtx.moveTo(x, y) : waveformCtx.lineTo(x, y);
     }
+    waveformCtx.strokeStyle = '#2BAF90';
+    waveformCtx.lineWidth = 2;
+    waveformCtx.stroke();
 
-    function stopNote(key) {
-        const oscData = oscillators[key];
-        if (oscData) {
-            oscData.gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.01);
-            setTimeout(() => {
-                oscData.osc.stop();
-                delete oscillators[key];
-            }, 100);
-        }
-
-        document.getElementById(`key-${key.toUpperCase()}`)?.classList.remove('active');
+    // Frequency Spectrum
+    analyser.getByteFrequencyData(dataArray);
+    frequencyCtx.clearRect(0, 0, frequencyCanvas.width, frequencyCanvas.height);
+    for (let i = 0; i < bufferLength; i++) {
+      const x = i * (frequencyCanvas.width / bufferLength);
+      const height = dataArray[i] / 255 * frequencyCanvas.height;
+      const hue = 30 + (i / bufferLength) * 60;
+      frequencyCtx.fillStyle = `hsl(${hue}, 90%, 50%)`;
+      frequencyCtx.fillRect(x, frequencyCanvas.height - height, 2, height);
     }
+  }
 
-    document.addEventListener('keydown', (e) => {
-        playNote(e.key.toUpperCase());
-    });
-
-    document.addEventListener('keyup', (e) => {
-        stopNote(e.key.toUpperCase());
-    });
-
-    // Mouse interaction
-    document.querySelectorAll('.key').forEach(keyEl => {
-        keyEl.addEventListener('mousedown', () => playNote(keyEl.textContent));
-        keyEl.addEventListener('mouseup', () => stopNote(keyEl.textContent));
-        keyEl.addEventListener('mouseleave', () => stopNote(keyEl.textContent));
-    });
-
-    function draw() {
-        requestAnimationFrame(draw);
-
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        // Oscilloscope
-        analyser.getByteTimeDomainData(dataArray);
-        waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
-        waveformCtx.beginPath();
-        for (let i = 0; i < bufferLength; i++) {
-            const x = i / bufferLength * waveformCanvas.width;
-            const y = (dataArray[i] / 128.0) * waveformCanvas.height / 2;
-            i === 0 ? waveformCtx.moveTo(x, y) : waveformCtx.lineTo(x, y);
-        }
-        waveformCtx.strokeStyle = '#2BAF90';
-        waveformCtx.lineWidth = 2;
-        waveformCtx.stroke();
-
-        // Frequency Spectrum
-        analyser.getByteFrequencyData(dataArray);
-        frequencyCtx.clearRect(0, 0, frequencyCanvas.width, frequencyCanvas.height);
-        for (let i = 0; i < bufferLength; i++) {
-            const x = i * (frequencyCanvas.width / bufferLength);
-            const height = dataArray[i] / 255 * frequencyCanvas.height;
-
-            const hue = 30 + (i / bufferLength) * 60; // Range from orange to red
-            frequencyCtx.fillStyle = `hsl(${hue}, 90%, 50%)`;
-            frequencyCtx.fillRect(x, frequencyCanvas.height - height, 2, height);
-        }
-    }
-
-    draw();
+  draw();
 </script>
 
 </body>
