@@ -2,51 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Synth Piano</title>
+  <title>Advanced Synth Piano</title>
   <style>
     body {
       background: #0D2A35;
       color: #A1D4B1;
-      font-family: 'Arial', sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       padding: 20px;
       text-align: center;
     }
 
     h1 {
-      color: #dd4111;
+      color: #F1A512;
       margin-bottom: 20px;
     }
 
-    #piano {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-bottom: 30px;
+    #pianoContainer {
+      position: relative;
+      width: 700px;
+      margin: 0 auto 40px;
+      height: 200px;
     }
 
-    .key {
-      background: #2BAF90;
-      border: none;
-      width: 40px;
-      height: 150px;
-      font-weight: bold;
-      color: #0D2A35;
+    .white-key, .black-key {
+      position: absolute;
+      border-radius: 4px;
       cursor: pointer;
-      border-radius: 6px;
-      transition: background 0.1s;
+      font-size: 10px;
+      text-align: center;
+      line-height: 180px;
+      user-select: none;
+    }
+
+    .white-key {
+      width: 40px;
+      height: 180px;
+      background: #2BAF90;
+      color: #0D2A35;
+      border: 1px solid #0D2A35;
+      z-index: 1;
+    }
+
+    .black-key {
+      width: 25px;
+      height: 120px;
+      background: #8C0027;
+      color: white;
+      z-index: 2;
+      top: 0;
     }
 
     .key.pressed {
-      background: #F1A512;
-    }
-
-    canvas {
-      display: block;
-      margin: 20px auto;
-      background: #001a21;
-      border-radius: 10px;
-      border: 2px solid #2BAF90;
+      background: #F1A512 !important;
+      color: #0D2A35;
     }
 
     .sliders {
@@ -59,7 +67,7 @@
 
     .slider-group {
       text-align: center;
-      width: 150px;
+      width: 160px;
     }
 
     label {
@@ -76,7 +84,6 @@
       background: #A1D4B1;
       border-radius: 3px;
       outline: none;
-      transition: background 0.3s;
     }
 
     input[type=range]::-webkit-slider-thumb {
@@ -85,20 +92,44 @@
       width: 16px;
       height: 16px;
       background: #DD4111;
-      border: 2px solid #8C0027;
+      border: 2px solid #F1A512;
       border-radius: 50%;
       cursor: pointer;
-      transition: background 0.3s;
     }
 
-    input[type=range]:hover::-webkit-slider-thumb {
-      background: #F1A512;
+    canvas {
+      display: block;
+      margin: 20px auto;
+      background: #001a21;
+      border-radius: 10px;
+      border: 2px solid #2BAF90;
+    }
+
+    select {
+      background: #2BAF90;
+      color: #0D2A35;
+      font-size: 16px;
+      padding: 4px;
+      border-radius: 5px;
+      border: 2px solid #F1A512;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Synth Piano</h1>
-  <div id="piano"></div>
+  <h1>Advanced Synth Piano</h1>
+
+  <div>
+    <label for="waveform">Waveform</label>
+    <select id="waveform">
+      <option value="sine">Sine</option>
+      <option value="square">Square</option>
+      <option value="sawtooth">Sawtooth</option>
+      <option value="triangle">Triangle</option>
+    </select>
+  </div>
+
+  <div id="pianoContainer"></div>
 
   <div class="sliders">
     <div class="slider-group">
@@ -138,6 +169,7 @@
     gainNode.connect(analyser);
     analyser.connect(context.destination);
 
+    const waveformSelect = document.getElementById("waveform");
     const volumeSlider = document.getElementById("volume");
     const masterFreqSlider = document.getElementById("masterFreq");
 
@@ -146,82 +178,77 @@
     const sustainSlider = document.getElementById("sustain");
     const releaseSlider = document.getElementById("release");
 
-    volumeSlider.addEventListener("input", () => {
-      gainNode.gain.value = volumeSlider.value;
-    });
-
     gainNode.gain.value = volumeSlider.value;
 
-    const keys = "ASDFGHJKL".split("");
-    const piano = document.getElementById("piano");
+    const notes = [
+      { note: "C", freq: 261.63 },
+      { note: "C#", freq: 277.18 },
+      { note: "D", freq: 293.66 },
+      { note: "D#", freq: 311.13 },
+      { note: "E", freq: 329.63 },
+      { note: "F", freq: 349.23 },
+      { note: "F#", freq: 369.99 },
+      { note: "G", freq: 392.00 },
+      { note: "G#", freq: 415.30 },
+      { note: "A", freq: 440.00 },
+      { note: "A#", freq: 466.16 },
+      { note: "B", freq: 493.88 }
+    ];
 
-    const keyStates = {};
+    const piano = document.getElementById("pianoContainer");
+    const keyMap = {};
+    const keyWidth = 40;
+    const blackOffsets = { 1: true, 3: true, 6: true, 8: true, 10: true };
 
-    keys.forEach((keyChar, i) => {
+    notes.forEach((n, i) => {
+      const isBlack = n.note.includes("#");
       const key = document.createElement("div");
-      key.className = "key";
-      key.textContent = keyChar;
+      key.className = isBlack ? "black-key key" : "white-key key";
+      key.textContent = n.note;
+      const pos = i - (isBlack ? 0.5 : 0);
+      key.style.left = `${pos * keyWidth}px`;
       piano.appendChild(key);
 
       const playNote = () => {
-        const freq = parseFloat(masterFreqSlider.value) * Math.pow(2, i / 12);
         const osc = context.createOscillator();
         const amp = context.createGain();
 
-        osc.type = "sine";
+        const freq = n.freq * parseFloat(masterFreqSlider.value) / 440;
         osc.frequency.value = freq;
-        osc.connect(amp).connect(gainNode);
+        osc.type = waveformSelect.value;
 
         const now = context.currentTime;
         const attack = parseFloat(attackSlider.value);
         const decay = parseFloat(decaySlider.value);
         const sustain = parseFloat(sustainSlider.value);
         const release = parseFloat(releaseSlider.value);
+        const vol = parseFloat(volumeSlider.value);
 
         amp.gain.setValueAtTime(0, now);
-        amp.gain.linearRampToValueAtTime(volumeSlider.value, now + attack);
-        amp.gain.linearRampToValueAtTime(volumeSlider.value * sustain, now + attack + decay);
+        amp.gain.linearRampToValueAtTime(vol, now + attack);
+        amp.gain.linearRampToValueAtTime(vol * sustain, now + attack + decay);
 
+        osc.connect(amp).connect(gainNode);
         osc.start(now);
-        keyStates[keyChar] = { osc, amp, startedAt: now, release };
-      };
 
-      const stopNote = () => {
-        const note = keyStates[keyChar];
-        if (!note) return;
+        key.classList.add("pressed");
 
-        const now = context.currentTime;
-        note.amp.gain.cancelScheduledValues(now);
-        note.amp.gain.setValueAtTime(note.amp.gain.value, now);
-        note.amp.gain.linearRampToValueAtTime(0, now + note.release);
-        note.osc.stop(now + note.release);
-        delete keyStates[keyChar];
+        return () => {
+          amp.gain.cancelScheduledValues(now);
+          amp.gain.setValueAtTime(amp.gain.value, now);
+          amp.gain.linearRampToValueAtTime(0, now + release);
+          osc.stop(now + release);
+          key.classList.remove("pressed");
+        };
       };
 
       key.addEventListener("mousedown", () => {
-        key.classList.add("pressed");
-        playNote();
-      });
-      key.addEventListener("mouseup", () => {
-        key.classList.remove("pressed");
-        stopNote();
-      });
-
-      window.addEventListener("keydown", (e) => {
-        if (e.key.toUpperCase() === keyChar && !keyStates[keyChar]) {
-          key.classList.add("pressed");
-          playNote();
-        }
-      });
-
-      window.addEventListener("keyup", (e) => {
-        if (e.key.toUpperCase() === keyChar) {
-          key.classList.remove("pressed");
-          stopNote();
-        }
+        const stop = playNote();
+        key.onmouseup = () => stop();
       });
     });
 
+    // Visualizers
     const oscCanvas = document.getElementById("oscilloscope");
     const oscCtx = oscCanvas.getContext("2d");
     const freqCanvas = document.getElementById("frequency");
@@ -236,7 +263,6 @@
       oscCtx.lineWidth = 2;
       oscCtx.strokeStyle = "#F1A512";
       oscCtx.beginPath();
-
       const sliceWidth = oscCanvas.width / dataArray.length;
       let x = 0;
       for (let i = 0; i < dataArray.length; i++) {
@@ -245,7 +271,6 @@
         i === 0 ? oscCtx.moveTo(x, y) : oscCtx.lineTo(x, y);
         x += sliceWidth;
       }
-      oscCtx.lineTo(oscCanvas.width, oscCanvas.height / 2);
       oscCtx.stroke();
     }
 
